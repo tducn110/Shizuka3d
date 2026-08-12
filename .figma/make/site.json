@@ -1,0 +1,10 @@
+{
+  "description": "Enables users to execute Go code snippets instantly, providing a seamless environment for learning, testing, and debugging Go programs online.",
+  "robots": {
+    "index": false
+  },
+  "accessibility": {
+    "addBypassLinks": false,
+    "ignoreReducedMotion": false
+  }
+}
