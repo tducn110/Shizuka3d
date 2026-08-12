@@ -1,15 +1,9 @@
 import { useEffect, useRef, useState, useMemo, useCallback } from "react"
+import { useCameraRotation, formatPt, project3D } from "./game/hooks/useCameraRotation"
+import { Camera, RotateCcw, RotateCw, Pause, Play, RefreshCw } from "lucide-react"
 
-// ── Isometric projection ────────────────────────────────────────────────────
-const S = 40 // pixels per grid unit
-
-function iso(x: number, y: number, z: number) {
-  return { sx: (x - y) * S, sy: (x + y) * S * 0.5 - z * S }
-}
-function p(x: number, y: number, z: number) {
-  const { sx, sy } = iso(x, y, z)
-  return `${sx.toFixed(1)},${sy.toFixed(1)}`
-}
+// ── Grid units and scale ───────────────────────────────────────────────────
+const S = 48 // pixels per grid unit
 
 // ── Height map (7×7) ────────────────────────────────────────────────────────
 const H: number[][] = [
@@ -44,13 +38,30 @@ interface BoxDef {
   height: number
 }
 
-// ── Component ────────────────────────────────────────────────────────────────
 interface Props {
   onPlay?: () => void
 }
 
 export default function IsometricScene({ onPlay }: Props) {
-  // Smooth mouse tracking via raf lerp
+  // Camera rotation hook with automatic sway ("quay qua quay lại")
+  const {
+    angle,
+    isSwaying,
+    toggleSway,
+    rotateLeft,
+    rotateRight,
+    resetCamera,
+  } = useCameraRotation({
+    autoSway: true,
+    swaySpeed: 0.85,
+    swayAmplitude: 0.42,
+  })
+
+  // Center of 7x7 grid
+  const xc = 3.5
+  const yc = 3.5
+
+  // Smooth mouse tracking for subtle tilt/parallax
   const targetRef = useRef({ x: 0, y: 0 })
   const [smooth, setSmooth] = useState({ x: 0, y: 0 })
 
@@ -78,36 +89,30 @@ export default function IsometricScene({ onPlay }: Props) {
     }
   }, [onMove])
 
-  // ── Touch parallax ──────────────────────────────────────────────────────
-  const onTouch = useCallback((e: React.TouchEvent) => {
-    const t = e.touches[0]
-    if (!t) return
-    targetRef.current = {
-      x: (t.clientX / window.innerWidth - 0.5) * 2,
-      y: (t.clientY / window.innerHeight - 0.5) * 2,
-    }
-  }, [])
-
-  // ── Build sorted box list ───────────────────────────────────────────────
-  const boxes = useMemo((): BoxDef[] => {
+  // Build box list and dynamically sort back-to-front depending on camera angle
+  const sortedBoxes = useMemo((): BoxDef[] => {
     const list: BoxDef[] = []
-    for (let row = 0; row < 7; row++)
-      for (let col = 0; col < 7; col++)
+    for (let row = 0; row < 7; row++) {
+      for (let col = 0; col < 7; col++) {
         list.push({ col, row, height: H[row][col] })
-    // Painter's algorithm: back→front = ascending (col+row), then ascending col
+      }
+    }
+    // Dynamic painter's algorithm: sort by projected depth along viewing ray
     list.sort((a, b) => {
-      const s = (a.col + a.row) - (b.col + b.row)
-      return s !== 0 ? s : a.col - b.col
+      const depthA = project3D(a.col + 0.5, a.row + 0.5, 0, xc, yc, angle, S).depth
+      const depthB = project3D(b.col + 0.5, b.row + 0.5, 0, xc, yc, angle, S).depth
+      return depthA - depthB
     })
     return list
-  }, [])
+  }, [angle, xc, yc])
 
-  // ── SVG viewBox origin ──────────────────────────────────────────────────
-  // Isometric center of the 7×7 grid at z=0 is at iso(3.5, 3.5, 0)
-  // sx=0, sy=3.5*S = 140 → shift view so (0, 140) maps to viewport center
+  // Helper function to format 3D point to projected SVG coords
+  const p = (x: number, y: number, z: number) =>
+    formatPt(x, y, z, xc, yc, angle, S)
+
   const VW = 860, VH = 680
-  const ox = VW / 2         // horizontal center = 0 in iso coords → ok
-  const oy = VH / 2 - 30    // push scene up slightly so text below has room
+  const ox = VW / 2
+  const oy = VH / 2 - 30
 
   return (
     <div
@@ -122,9 +127,72 @@ export default function IsometricScene({ onPlay }: Props) {
         overflow: "hidden",
         fontFamily: "'Outfit', sans-serif",
         userSelect: "none",
+        position: "relative",
       }}
-      onTouchMove={onTouch}
     >
+      {/* ── Camera Rotation Control Toolbar ────────────────────────────── */}
+      <div
+        style={{
+          position: "absolute",
+          top: 24,
+          zIndex: 20,
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          background: "rgba(255, 255, 255, 0.75)",
+          backdropFilter: "blur(12px)",
+          WebkitBackdropFilter: "blur(12px)",
+          padding: "8px 16px",
+          borderRadius: 24,
+          border: "1px solid rgba(0, 0, 0, 0.08)",
+          boxShadow: "0 8px 32px rgba(0,0,0,0.08)",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 6, marginRight: 8, color: "#4a3b32", fontWeight: 600, fontSize: 13 }}>
+          <Camera size={16} />
+          <span>Camera Control</span>
+        </div>
+
+        <button
+          onClick={rotateLeft}
+          title="Quay trái (Rotate Left)"
+          style={btnStyle}
+        >
+          <RotateCcw size={15} />
+        </button>
+
+        <button
+          onClick={toggleSway}
+          title={isSwaying ? "Tắt quay qua quay lại" : "Bật quay qua quay lại (Auto Sway)"}
+          style={{
+            ...btnStyle,
+            background: isSwaying ? "#2e2016" : "rgba(0,0,0,0.05)",
+            color: isSwaying ? "#faf7f0" : "#2e2016",
+          }}
+        >
+          {isSwaying ? <Pause size={15} /> : <Play size={15} />}
+          <span style={{ fontSize: 12, fontWeight: 600, marginLeft: 4 }}>
+            {isSwaying ? "Quay qua lại ON" : "Quay qua lại OFF"}
+          </span>
+        </button>
+
+        <button
+          onClick={rotateRight}
+          title="Quay phải (Rotate Right)"
+          style={btnStyle}
+        >
+          <RotateCw size={15} />
+        </button>
+
+        <button
+          onClick={resetCamera}
+          title="Đặt lại camera (Reset Camera)"
+          style={btnStyle}
+        >
+          <RefreshCw size={14} />
+        </button>
+      </div>
+
       {/* ── Isometric SVG scene ─────────────────────────────────────── */}
       <div style={{ position: "relative", width: "100%", flex: 1, minHeight: 0 }}>
         <svg
@@ -135,10 +203,9 @@ export default function IsometricScene({ onPlay }: Props) {
             overflow: "visible",
           }}
         >
-          {/* ── Drop shadows (rendered below boxes) ─────────────────── */}
           <defs>
             <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
-              <feDropShadow dx="0" dy="4" stdDeviation="6" floodColor="#00000018" />
+              <feDropShadow dx="0" dy="6" stdDeviation="8" floodColor="#00000018" />
             </filter>
             <radialGradient id="groundGrad" cx="50%" cy="50%" r="50%">
               <stop offset="0%" stopColor="#d8cfc0" />
@@ -146,43 +213,38 @@ export default function IsometricScene({ onPlay }: Props) {
             </radialGradient>
           </defs>
 
-          {/* ── Ground ellipse ───────────────────────────────────────── */}
+          {/* Ground ellipse */}
           <ellipse
             cx={0}
-            cy={S * 3.5}
-            rx={S * 7.2}
-            ry={S * 3.6}
+            cy={S * 0.5}
+            rx={S * 6.5}
+            ry={S * 3.4}
             fill="url(#groundGrad)"
             opacity={0.55}
           />
 
-          {/* ── Boxes ───────────────────────────────────────────────── */}
+          {/* 3D Boxes dynamically depth sorted */}
           <g filter="url(#shadow)">
-            {boxes.map(({ col, row, height: h }) => {
+            {sortedBoxes.map(({ col, row, height: h }) => {
               const [cTop, cRight, cLeft] = palFor(h)
 
-              // Parallax: taller boxes shift more — creates "standing up" effect
-              const px = smooth.x * h * -5
-              const py = smooth.y * h * -7
+              // Parallax mouse tilt
+              const px = smooth.x * h * -4
+              const py = smooth.y * h * -5
 
               const c = col, r = row
 
-              // 8 corners of the unit cube [col, row, 0..h]
-              // Top face
+              // Top face 4 corners
               const tA = p(c,   r,   h)
               const tB = p(c+1, r,   h)
               const tC = p(c+1, r+1, h)
               const tD = p(c,   r+1, h)
-              // Right face (x = c+1)
+
+              // Bottom face 4 corners
               const rC = p(c+1, r+1, 0)
               const rD = p(c+1, r,   0)
-              // Left face (y = r+1)
               const lC = p(c+1, r+1, 0)
               const lD = p(c,   r+1, 0)
-
-              // Stroke is same as face but slightly darker
-              const strokeR = cRight
-              const strokeL = cLeft
 
               return (
                 <g
@@ -193,7 +255,7 @@ export default function IsometricScene({ onPlay }: Props) {
                   <polygon
                     points={`${tB} ${tC} ${rC} ${rD}`}
                     fill={cRight}
-                    stroke={strokeR}
+                    stroke={cRight}
                     strokeWidth="0.5"
                     strokeLinejoin="round"
                   />
@@ -201,7 +263,7 @@ export default function IsometricScene({ onPlay }: Props) {
                   <polygon
                     points={`${tD} ${tC} ${lC} ${lD}`}
                     fill={cLeft}
-                    stroke={strokeL}
+                    stroke={cLeft}
                     strokeWidth="0.5"
                     strokeLinejoin="round"
                   />
@@ -213,7 +275,7 @@ export default function IsometricScene({ onPlay }: Props) {
                     strokeWidth="0.5"
                     strokeLinejoin="round"
                   />
-                  {/* Top face highlight edge */}
+                  {/* Top face highlights */}
                   <line
                     x1={p(c, r, h).split(",")[0]}   y1={p(c, r, h).split(",")[1]}
                     x2={p(c+1, r, h).split(",")[0]} y2={p(c+1, r, h).split(",")[1]}
@@ -258,7 +320,7 @@ export default function IsometricScene({ onPlay }: Props) {
             fontWeight: 600,
           }}
         >
-          Puzzle Game
+          Isometric 3D Camera • Shikaku
         </p>
         <h1
           style={{
@@ -270,7 +332,7 @@ export default function IsometricScene({ onPlay }: Props) {
             lineHeight: 1,
           }}
         >
-          Shikaku
+          Shikaku 3D
         </h1>
         {onPlay && (
           <button
@@ -300,10 +362,23 @@ export default function IsometricScene({ onPlay }: Props) {
               e.currentTarget.style.boxShadow = "0 8px 24px rgba(0,0,0,0.18)"
             }}
           >
-            Play →
+            Play Game →
           </button>
         )}
       </div>
     </div>
   )
+}
+
+const btnStyle: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  padding: "6px 10px",
+  borderRadius: 12,
+  border: "none",
+  background: "rgba(0, 0, 0, 0.05)",
+  color: "#2e2016",
+  cursor: "pointer",
+  transition: "all 0.15s ease",
 }

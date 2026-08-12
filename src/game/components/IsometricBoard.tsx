@@ -1,38 +1,34 @@
 import { useRef, useEffect, useState, useMemo, useCallback } from "react"
 import type { Level, Region, RegionDef, Selection, GameStatus } from "../types/shikaku.types"
 import { normalizeSelection } from "../engine/rectangle"
+import { useCameraRotation, formatPt, project3D } from "../hooks/useCameraRotation"
+import { Camera, RotateCcw, RotateCw, Pause, Play, RefreshCw } from "lucide-react"
 
-// ── Iso math ────────────────────────────────────────────────────────────────
-
-function makeIso(S: number) {
-  const project = (x: number, y: number, z: number) => ({
-    sx: (x - y) * S,
-    sy: (x + y) * S * 0.5 - z * S,
-  })
-  const pt = (x: number, y: number, z: number) => {
-    const { sx, sy } = project(x, y, z)
-    return `${sx.toFixed(1)},${sy.toFixed(1)}`
-  }
-  return { project, pt }
-}
-
-// Screen (clientX/Y) → fractional grid (col, row) using SVG CTM
-function screenToGrid(
+// Screen (clientX/Y) → fractional grid (col, row) for ANY camera rotation theta
+function screenToGrid3D(
   svgEl: SVGSVGElement,
   clientX: number,
   clientY: number,
-  S: number
+  S: number,
+  xc: number,
+  yc: number,
+  theta: number
 ): { col: number; row: number } | null {
   const ctm = svgEl.getScreenCTM()
   if (!ctm) return null
-  const p = svgEl.createSVGPoint()
-  p.x = clientX
-  p.y = clientY
-  const { x: sx, y: sy } = p.matrixTransform(ctm.inverse())
-  return {
-    col: (sx / S + (sy * 2) / S) / 2,
-    row: ((sy * 2) / S - sx / S) / 2,
-  }
+  const pt = svgEl.createSVGPoint()
+  pt.x = clientX
+  pt.y = clientY
+  const { x: sx, y: sy } = pt.matrixTransform(ctm.inverse())
+
+  // Ground plane z=0 projection inverse
+  const rx = sx / S
+  const ry = (sy * 2) / S
+
+  const col = xc + rx * Math.cos(theta) + ry * Math.sin(theta)
+  const row = yc - rx * Math.sin(theta) + ry * Math.cos(theta)
+
+  return { col, row }
 }
 
 // ── Color helpers ────────────────────────────────────────────────────────────
@@ -50,13 +46,10 @@ function deriveShades(hex: string) {
   }
 }
 
-// ── Visual height per region ─────────────────────────────────────────────────
-
+// Visual height per region
 function boxH(clueValue: number): number {
   return Math.max(0.7, clueValue * 0.28)
 }
-
-// ── Component ────────────────────────────────────────────────────────────────
 
 interface Props {
   level: Level
@@ -71,8 +64,24 @@ export default function IsometricBoard({
   level, regions, hintRegion, gameStatus, onPlaceRegion, onRemoveRegion,
 }: Props) {
   const { rows, cols, clues } = level
+  const xc = cols / 2
+  const yc = rows / 2
 
-  // ── Container resize → compute S ─────────────────────────────────────────
+  // Camera rotation hook with automatic sway ("quay qua quay lại")
+  const {
+    angle,
+    isSwaying,
+    toggleSway,
+    rotateLeft,
+    rotateRight,
+    resetCamera,
+  } = useCameraRotation({
+    autoSway: true,
+    swaySpeed: 0.65,
+    swayAmplitude: 0.35,
+  })
+
+  // Container resize → compute scale S
   const containerRef = useRef<HTMLDivElement>(null)
   const svgRef = useRef<SVGSVGElement>(null)
   const [S, setS] = useState(36)
@@ -97,7 +106,7 @@ export default function IsometricBoard({
     return () => obs.disconnect()
   }, [rows, cols, maxH])
 
-  // ── Smooth mouse parallax ────────────────────────────────────────────────
+  // Smooth mouse parallax
   const targetMouse = useRef({ x: 0, y: 0 })
   const [mouse, setMouse] = useState({ x: 0, y: 0 })
 
@@ -125,7 +134,7 @@ export default function IsometricBoard({
     }
   }, [onGlobalMove])
 
-  // ── Region box height animation (spring on placement) ───────────────────
+  // Region box height animation (spring on placement)
   const animH = useRef<Map<string, { curr: number; target: number }>>(new Map())
   const [, bumpRender] = useState(0)
 
@@ -154,7 +163,7 @@ export default function IsometricBoard({
     return () => cancelAnimationFrame(raf)
   }, [])
 
-  // ── Pointer drag state ───────────────────────────────────────────────────
+  // Pointer drag state
   const [selection, setSelection] = useState<Selection | null>(null)
   const [selState, setSelState] = useState<"dragging" | "invalid">("dragging")
   const dragging = useRef(false)
@@ -179,10 +188,10 @@ export default function IsometricBoard({
 
   const getCell = useCallback((e: React.PointerEvent<SVGSVGElement>) => {
     if (!svgRef.current) return null
-    const raw = screenToGrid(svgRef.current, e.clientX, e.clientY, S)
+    const raw = screenToGrid3D(svgRef.current, e.clientX, e.clientY, S, xc, yc, angle)
     if (!raw) return null
     return clampCell(raw.col, raw.row)
-  }, [S, clampCell])
+  }, [S, xc, yc, angle, clampCell])
 
   const handlePointerDown = useCallback((e: React.PointerEvent<SVGSVGElement>) => {
     if (disabled) return
@@ -239,10 +248,7 @@ export default function IsometricBoard({
     setSelection(null); setSelState("dragging")
   }, [])
 
-  // ── Compute iso helpers ──────────────────────────────────────────────────
-  const { project, pt } = useMemo(() => makeIso(S), [S])
-
-  // ViewBox: bounding box of the full board
+  // ViewBox limits
   const vbLeft   = -(rows + 0.5) * S
   const vbRight  = (cols + 0.5) * S
   const vbTop    = -(maxH + 0.8) * S
@@ -250,40 +256,119 @@ export default function IsometricBoard({
   const vbW = vbRight - vbLeft
   const vbH = vbBottom - vbTop
 
-  // ── Sorted render list ───────────────────────────────────────────────────
-  const sortedRegions = useMemo(() =>
-    [...regions].sort((a, b) => (a.col + a.row) - (b.col + b.row)),
-  [regions])
+  // Dynamic depth sorting for region boxes based on current camera angle theta
+  const sortedRegions = useMemo(() => {
+    return [...regions].sort((a, b) => {
+      const centerA_x = a.col + a.width / 2
+      const centerA_y = a.row + a.height / 2
+      const centerB_x = b.col + b.width / 2
+      const centerB_y = b.row + b.height / 2
+      const depthA = project3D(centerA_x, centerA_y, 0, xc, yc, angle, S).depth
+      const depthB = project3D(centerB_x, centerB_y, 0, xc, yc, angle, S).depth
+      return depthA - depthB
+    })
+  }, [regions, angle, xc, yc, S])
 
-  const cellToRegion = cellRegionMap
+  // Ground cells dynamic depth sort
   const sortedGroundCells = useMemo(() => {
     const cells: { col: number; row: number }[] = []
     for (let r = 0; r < rows; r++)
       for (let c = 0; c < cols; c++)
         cells.push({ col: c, row: r })
-    return cells.sort((a, b) => (a.col + a.row) - (b.col + b.row))
-  }, [rows, cols])
+
+    return cells.sort((a, b) => {
+      const depthA = project3D(a.col + 0.5, a.row + 0.5, 0, xc, yc, angle, S).depth
+      const depthB = project3D(b.col + 0.5, b.row + 0.5, 0, xc, yc, angle, S).depth
+      return depthA - depthB
+    })
+  }, [rows, cols, angle, xc, yc, S])
+
+  const pt = (x: number, y: number, z: number) =>
+    formatPt(x, y, z, xc, yc, angle, S)
 
   const selRect = selection ? normalizeSelection(selection) : null
 
-  // ── Parallax helper ──────────────────────────────────────────────────────
   const parallax = (h: number) => ({
-    dx: mouse.x * h * -5,
-    dy: mouse.y * h * -7,
+    dx: mouse.x * h * -4,
+    dy: mouse.y * h * -5,
   })
 
   return (
     <div
       ref={containerRef}
-      style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center" }}
+      style={{
+        width: "100%",
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        position: "relative",
+      }}
     >
+      {/* ── Top Camera Rotation Controls ────────────────────────────── */}
+      <div
+        style={{
+          position: "absolute",
+          top: 12,
+          zIndex: 15,
+          display: "flex",
+          alignItems: "center",
+          gap: 6,
+          background: "rgba(255, 255, 255, 0.82)",
+          backdropFilter: "blur(10px)",
+          WebkitBackdropFilter: "blur(10px)",
+          padding: "6px 14px",
+          borderRadius: 20,
+          boxShadow: "0 4px 20px rgba(0,0,0,0.08)",
+          border: "1px solid rgba(0,0,0,0.06)",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 5, marginRight: 6, color: "#4a3b32", fontWeight: 600, fontSize: 12 }}>
+          <Camera size={14} />
+          <span>Camera</span>
+        </div>
+
+        <button onClick={rotateLeft} title="Quay trái" style={btnStyle}>
+          <RotateCcw size={14} />
+        </button>
+
+        <button
+          onClick={toggleSway}
+          title={isSwaying ? "Tắt quay qua quay lại" : "Bật quay qua quay lại"}
+          style={{
+            ...btnStyle,
+            background: isSwaying ? "#2e2016" : "rgba(0,0,0,0.06)",
+            color: isSwaying ? "#faf7f0" : "#2e2016",
+          }}
+        >
+          {isSwaying ? <Pause size={14} /> : <Play size={14} />}
+          <span style={{ fontSize: 11, fontWeight: 600, marginLeft: 4 }}>
+            {isSwaying ? "Quay qua lại ON" : "Quay qua lại OFF"}
+          </span>
+        </button>
+
+        <button onClick={rotateRight} title="Quay phải" style={btnStyle}>
+          <RotateCw size={14} />
+        </button>
+
+        <button onClick={resetCamera} title="Reset camera" style={btnStyle}>
+          <RefreshCw size={13} />
+        </button>
+      </div>
+
       <svg
         ref={svgRef}
         viewBox={`${vbLeft} ${vbTop} ${vbW} ${vbH}`}
         width="100%"
         height="100%"
         preserveAspectRatio="xMidYMid meet"
-        style={{ overflow: "visible", touchAction: "none", userSelect: "none", cursor: disabled ? "default" : "crosshair" }}
+        style={{
+          overflow: "visible",
+          touchAction: "none",
+          userSelect: "none",
+          cursor: disabled ? "default" : "crosshair",
+        }}
         onPointerDown={handlePointerDown}
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
@@ -298,7 +383,7 @@ export default function IsometricBoard({
         {/* ── Ground tiles ──────────────────────────────────────────── */}
         <g>
           {sortedGroundCells.map(({ col: c, row: r }) => {
-            const inRegion = cellToRegion.has(`${r},${c}`)
+            const inRegion = cellRegionMap.has(`${r},${c}`)
             return (
               <polygon
                 key={`g${c}-${r}`}
@@ -346,15 +431,15 @@ export default function IsometricBoard({
                   strokeWidth={0.4}
                   strokeLinejoin="round"
                 />
-                {/* Top highlight edge */}
+                {/* Top highlight edges */}
                 <line
-                  x1={project(c0,r0,h).sx} y1={project(c0,r0,h).sy}
-                  x2={project(c1,r0,h).sx} y2={project(c1,r0,h).sy}
+                  x1={project3D(c0,r0,h,xc,yc,angle,S).sx} y1={project3D(c0,r0,h,xc,yc,angle,S).sy}
+                  x2={project3D(c1,r0,h,xc,yc,angle,S).sx} y2={project3D(c1,r0,h,xc,yc,angle,S).sy}
                   stroke="rgba(255,255,255,0.5)" strokeWidth={1.2}
                 />
                 <line
-                  x1={project(c0,r0,h).sx} y1={project(c0,r0,h).sy}
-                  x2={project(c0,r1,h).sx} y2={project(c0,r1,h).sy}
+                  x1={project3D(c0,r0,h,xc,yc,angle,S).sx} y1={project3D(c0,r0,h,xc,yc,angle,S).sy}
+                  x2={project3D(c0,r1,h,xc,yc,angle,S).sx} y2={project3D(c0,r1,h,xc,yc,angle,S).sy}
                   stroke="rgba(255,255,255,0.28)" strokeWidth={0.8}
                 />
               </g>
@@ -394,7 +479,6 @@ export default function IsometricBoard({
               transform={`translate(${dx.toFixed(2)},${dy.toFixed(2)})`}
               style={{ animation: isInvalid ? "shake 0.35s ease-in-out" : undefined }}
             >
-              {/* Preview side faces */}
               <polygon
                 points={`${pt(c1,r0,h)} ${pt(c1,r1,h)} ${pt(c1,r1,0)} ${pt(c1,r0,0)}`}
                 fill={isInvalid ? "rgba(210,50,50,0.18)" : "rgba(80,120,220,0.15)"}
@@ -403,7 +487,6 @@ export default function IsometricBoard({
                 points={`${pt(c0,r1,h)} ${pt(c1,r1,h)} ${pt(c1,r1,0)} ${pt(c0,r1,0)}`}
                 fill={isInvalid ? "rgba(180,40,40,0.22)" : "rgba(70,100,200,0.18)"}
               />
-              {/* Preview top */}
               <polygon
                 points={`${pt(c0,r0,h)} ${pt(c1,r0,h)} ${pt(c1,r1,h)} ${pt(c0,r1,h)}`}
                 fill={fillColor}
@@ -414,14 +497,14 @@ export default function IsometricBoard({
           )
         })()}
 
-        {/* ── Clue numbers (always on top, with parallax) ───────────── */}
+        {/* ── Clue numbers ─────────────────────────────────────────── */}
         {clues.map(clue => {
           const region = cellRegionMap.get(`${clue.row},${clue.col}`)
           const h = region
             ? (animH.current.get(region.id)?.curr ?? boxH(region.clueValue))
             : 0
           const { dx, dy } = parallax(h)
-          const { sx, sy } = project(clue.col + 0.5, clue.row + 0.5, h + 0.02)
+          const { sx, sy } = project3D(clue.col + 0.5, clue.row + 0.5, h + 0.02, xc, yc, angle, S)
           const fontSize = Math.max(10, Math.min(22, S * 0.45))
           return (
             <text
@@ -445,4 +528,17 @@ export default function IsometricBoard({
       </svg>
     </div>
   )
+}
+
+const btnStyle: React.CSSProperties = {
+  display: "inline-flex",
+  alignItems: "center",
+  justifyContent: "center",
+  padding: "5px 8px",
+  borderRadius: 10,
+  border: "none",
+  background: "rgba(0, 0, 0, 0.05)",
+  color: "#2e2016",
+  cursor: "pointer",
+  transition: "all 0.15s ease",
 }
