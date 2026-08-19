@@ -34,18 +34,18 @@ export function useCameraRotation({
   }, [isSwaying, swaySpeed, swayAmplitude, baseAngle, manualOffset])
 
   const toggleSway = useCallback(() => {
-    setIsSwaying(prev => {
+    setIsSwaying((prev) => {
       if (!prev) startTimeRef.current = performance.now()
       return !prev
     })
   }, [])
 
   const rotateLeft = useCallback(() => {
-    setManualOffset(prev => prev - Math.PI / 6)
+    setManualOffset((prev) => prev - Math.PI / 6)
   }, [])
 
   const rotateRight = useCallback(() => {
-    setManualOffset(prev => prev + Math.PI / 6)
+    setManualOffset((prev) => prev + Math.PI / 6)
   }, [])
 
   const resetCamera = useCallback(() => {
@@ -75,7 +75,7 @@ export function project3D(
   xc: number,
   yc: number,
   theta: number,
-  S: number
+  S: number,
 ) {
   const dx = x - xc
   const dy = y - yc
@@ -93,7 +93,7 @@ export function formatPt(
   xc: number,
   yc: number,
   theta: number,
-  S: number
+  S: number,
 ) {
   const { sx, sy } = project3D(x, y, z, xc, yc, theta, S)
   return `${sx.toFixed(1)},${sy.toFixed(1)}`

@@ -25,7 +25,7 @@ function partition(
   cols: number,
   maxArea: number,
   stopProb: number,
-  rng: () => number
+  rng: () => number,
 ): RegionDef[] {
   const minArea = 2
 
@@ -45,7 +45,10 @@ function partition(
         const lo = minH
         const hi = h - minH
         const sp = lo + Math.floor(rng() * (hi - lo + 1))
-        return [...split(r0, c0, r0 + sp - 1, c1), ...split(r0 + sp, c0, r1, c1)]
+        return [
+          ...split(r0, c0, r0 + sp - 1, c1),
+          ...split(r0 + sp, c0, r1, c1),
+        ]
       }
       if (!horiz && w >= 2) {
         const minW = Math.ceil(minArea / h)
@@ -53,7 +56,10 @@ function partition(
         const lo = minW
         const hi = w - minW
         const sp = lo + Math.floor(rng() * (hi - lo + 1))
-        return [...split(r0, c0, r1, c0 + sp - 1), ...split(r0, c0 + sp, r1, c1)]
+        return [
+          ...split(r0, c0, r1, c0 + sp - 1),
+          ...split(r0, c0 + sp, r1, c1),
+        ]
       }
     }
 
@@ -64,7 +70,7 @@ function partition(
 }
 
 function placeClues(solution: RegionDef[], rng: () => number): Clue[] {
-  return solution.map(rect => ({
+  return solution.map((rect) => ({
     row: rect.row + Math.floor(rng() * rect.height),
     col: rect.col + Math.floor(rng() * rect.width),
     value: rect.height * rect.width,
@@ -79,16 +85,16 @@ interface Spec {
 }
 
 function specFor(i: number): Spec {
-  if (i < 10)  return { rows: 5, cols: 5,  maxArea: 6,  stopProb: 0.55 }
-  if (i < 20)  return { rows: 5, cols: 6,  maxArea: 7,  stopProb: 0.50 }
-  if (i < 30)  return { rows: 6, cols: 6,  maxArea: 8,  stopProb: 0.47 }
-  if (i < 40)  return { rows: 6, cols: 7,  maxArea: 9,  stopProb: 0.44 }
-  if (i < 50)  return { rows: 7, cols: 7,  maxArea: 9,  stopProb: 0.41 }
-  if (i < 60)  return { rows: 7, cols: 8,  maxArea: 10, stopProb: 0.38 }
-  if (i < 70)  return { rows: 8, cols: 8,  maxArea: 12, stopProb: 0.36 }
-  if (i < 80)  return { rows: 8, cols: 9,  maxArea: 12, stopProb: 0.33 }
-  if (i < 90)  return { rows: 9, cols: 9,  maxArea: 14, stopProb: 0.31 }
-  return         { rows: 9, cols: 10, maxArea: 15, stopProb: 0.29 }
+  if (i < 10) return { rows: 5, cols: 5, maxArea: 6, stopProb: 0.55 }
+  if (i < 20) return { rows: 5, cols: 6, maxArea: 7, stopProb: 0.5 }
+  if (i < 30) return { rows: 6, cols: 6, maxArea: 8, stopProb: 0.47 }
+  if (i < 40) return { rows: 6, cols: 7, maxArea: 9, stopProb: 0.44 }
+  if (i < 50) return { rows: 7, cols: 7, maxArea: 9, stopProb: 0.41 }
+  if (i < 60) return { rows: 7, cols: 8, maxArea: 10, stopProb: 0.38 }
+  if (i < 70) return { rows: 8, cols: 8, maxArea: 12, stopProb: 0.36 }
+  if (i < 80) return { rows: 8, cols: 9, maxArea: 12, stopProb: 0.33 }
+  if (i < 90) return { rows: 9, cols: 9, maxArea: 14, stopProb: 0.31 }
+  return { rows: 9, cols: 10, maxArea: 15, stopProb: 0.29 }
 }
 
 function makeLevel(id: number): Level {
@@ -102,4 +108,6 @@ function makeLevel(id: number): Level {
   return { id, rows, cols, clues, solution }
 }
 
-export const LEVELS: Level[] = Array.from({ length: 100 }, (_, i) => makeLevel(i + 1))
+export const LEVELS: Level[] = Array.from({ length: 100 }, (_, i) =>
+  makeLevel(i + 1),
+)

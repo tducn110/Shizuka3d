@@ -53,7 +53,15 @@ export default function PauseModal({ onResume, onRestart }: Props) {
   )
 }
 
-function Btn({ label, onClick, primary }: { label: string; onClick: () => void; primary?: boolean }) {
+function Btn({
+  label,
+  onClick,
+  primary,
+}: {
+  label: string
+  onClick: () => void
+  primary?: boolean
+}) {
   return (
     <button
       onClick={onClick}
@@ -69,8 +77,8 @@ function Btn({ label, onClick, primary }: { label: string; onClick: () => void; 
         cursor: "pointer",
         transition: "opacity 0.15s",
       }}
-      onMouseEnter={e => (e.currentTarget.style.opacity = "0.82")}
-      onMouseLeave={e => (e.currentTarget.style.opacity = "1")}
+      onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.82")}
+      onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
     >
       {label}
     </button>

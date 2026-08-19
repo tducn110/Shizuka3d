@@ -1,6 +1,17 @@
 import { useEffect, useRef, useState, useMemo, useCallback } from "react"
-import { useCameraRotation, formatPt, project3D } from "./game/hooks/useCameraRotation"
-import { Camera, RotateCcw, RotateCw, Pause, Play, RefreshCw } from "lucide-react"
+import {
+  useCameraRotation,
+  formatPt,
+  project3D,
+} from "./game/hooks/useCameraRotation"
+import {
+  Camera,
+  RotateCcw,
+  RotateCw,
+  Pause,
+  Play,
+  RefreshCw,
+} from "lucide-react"
 
 // ── Grid units and scale ───────────────────────────────────────────────────
 const S = 48 // pixels per grid unit
@@ -44,18 +55,12 @@ interface Props {
 
 export default function IsometricScene({ onPlay }: Props) {
   // Camera rotation hook with automatic sway ("quay qua quay lại")
-  const {
-    angle,
-    isSwaying,
-    toggleSway,
-    rotateLeft,
-    rotateRight,
-    resetCamera,
-  } = useCameraRotation({
-    autoSway: true,
-    swaySpeed: 0.85,
-    swayAmplitude: 0.42,
-  })
+  const { angle, isSwaying, toggleSway, rotateLeft, rotateRight, resetCamera } =
+    useCameraRotation({
+      autoSway: true,
+      swaySpeed: 0.85,
+      swayAmplitude: 0.42,
+    })
 
   // Center of 7x7 grid
   const xc = 3.5
@@ -76,7 +81,7 @@ export default function IsometricScene({ onPlay }: Props) {
     window.addEventListener("mousemove", onMove, { passive: true })
     let raf: number
     const tick = () => {
-      setSmooth(prev => ({
+      setSmooth((prev) => ({
         x: prev.x + (targetRef.current.x - prev.x) * 0.07,
         y: prev.y + (targetRef.current.y - prev.y) * 0.07,
       }))
@@ -99,8 +104,24 @@ export default function IsometricScene({ onPlay }: Props) {
     }
     // Dynamic painter's algorithm: sort by projected depth along viewing ray
     list.sort((a, b) => {
-      const depthA = project3D(a.col + 0.5, a.row + 0.5, 0, xc, yc, angle, S).depth
-      const depthB = project3D(b.col + 0.5, b.row + 0.5, 0, xc, yc, angle, S).depth
+      const depthA = project3D(
+        a.col + 0.5,
+        a.row + 0.5,
+        0,
+        xc,
+        yc,
+        angle,
+        S,
+      ).depth
+      const depthB = project3D(
+        b.col + 0.5,
+        b.row + 0.5,
+        0,
+        xc,
+        yc,
+        angle,
+        S,
+      ).depth
       return depthA - depthB
     })
     return list
@@ -110,16 +131,18 @@ export default function IsometricScene({ onPlay }: Props) {
   const p = (x: number, y: number, z: number) =>
     formatPt(x, y, z, xc, yc, angle, S)
 
-  const VW = 860, VH = 680
+  const VW = 860,
+    VH = 680
   const ox = VW / 2
   const oy = VH / 2 - 30
 
   return (
     <div
       style={{
-        width: "100vw",
-        height: "100dvh",
-        background: "radial-gradient(ellipse 120% 100% at 50% 60%, #f8f4ec 0%, #ece6d8 100%)",
+        width: "100%",
+        height: "100%",
+        background:
+          "radial-gradient(ellipse 120% 100% at 50% 60%, #f8f4ec 0%, #ece6d8 100%)",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
@@ -127,6 +150,9 @@ export default function IsometricScene({ onPlay }: Props) {
         overflow: "hidden",
         fontFamily: "'Outfit', sans-serif",
         userSelect: "none",
+        WebkitUserSelect: "none",
+        touchAction: "none",
+        overscrollBehavior: "none",
         position: "relative",
       }}
     >
@@ -148,7 +174,17 @@ export default function IsometricScene({ onPlay }: Props) {
           boxShadow: "0 8px 32px rgba(0,0,0,0.08)",
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 6, marginRight: 8, color: "#4a3b32", fontWeight: 600, fontSize: 13 }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            marginRight: 8,
+            color: "#4a3b32",
+            fontWeight: 600,
+            fontSize: 13,
+          }}
+        >
           <Camera size={16} />
           <span>Camera Control</span>
         </div>
@@ -163,7 +199,11 @@ export default function IsometricScene({ onPlay }: Props) {
 
         <button
           onClick={toggleSway}
-          title={isSwaying ? "Tắt quay qua quay lại" : "Bật quay qua quay lại (Auto Sway)"}
+          title={
+            isSwaying
+              ? "Tắt quay qua quay lại"
+              : "Bật quay qua quay lại (Auto Sway)"
+          }
           style={{
             ...btnStyle,
             background: isSwaying ? "#2e2016" : "rgba(0,0,0,0.05)",
@@ -194,7 +234,9 @@ export default function IsometricScene({ onPlay }: Props) {
       </div>
 
       {/* ── Isometric SVG scene ─────────────────────────────────────── */}
-      <div style={{ position: "relative", width: "100%", flex: 1, minHeight: 0 }}>
+      <div
+        style={{ position: "relative", width: "100%", flex: 1, minHeight: 0 }}
+      >
         <svg
           viewBox={`${-ox} ${-oy} ${VW} ${VH}`}
           style={{
@@ -205,7 +247,12 @@ export default function IsometricScene({ onPlay }: Props) {
         >
           <defs>
             <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
-              <feDropShadow dx="0" dy="6" stdDeviation="8" floodColor="#00000018" />
+              <feDropShadow
+                dx="0"
+                dy="6"
+                stdDeviation="8"
+                floodColor="#00000018"
+              />
             </filter>
             <radialGradient id="groundGrad" cx="50%" cy="50%" r="50%">
               <stop offset="0%" stopColor="#d8cfc0" />
@@ -232,19 +279,20 @@ export default function IsometricScene({ onPlay }: Props) {
               const px = smooth.x * h * -4
               const py = smooth.y * h * -5
 
-              const c = col, r = row
+              const c = col,
+                r = row
 
               // Top face 4 corners
-              const tA = p(c,   r,   h)
-              const tB = p(c+1, r,   h)
-              const tC = p(c+1, r+1, h)
-              const tD = p(c,   r+1, h)
+              const tA = p(c, r, h)
+              const tB = p(c + 1, r, h)
+              const tC = p(c + 1, r + 1, h)
+              const tD = p(c, r + 1, h)
 
               // Bottom face 4 corners
-              const rC = p(c+1, r+1, 0)
-              const rD = p(c+1, r,   0)
-              const lC = p(c+1, r+1, 0)
-              const lD = p(c,   r+1, 0)
+              const rC = p(c + 1, r + 1, 0)
+              const rD = p(c + 1, r, 0)
+              const lC = p(c + 1, r + 1, 0)
+              const lD = p(c, r + 1, 0)
 
               return (
                 <g
@@ -277,14 +325,18 @@ export default function IsometricScene({ onPlay }: Props) {
                   />
                   {/* Top face highlights */}
                   <line
-                    x1={p(c, r, h).split(",")[0]}   y1={p(c, r, h).split(",")[1]}
-                    x2={p(c+1, r, h).split(",")[0]} y2={p(c+1, r, h).split(",")[1]}
+                    x1={p(c, r, h).split(",")[0]}
+                    y1={p(c, r, h).split(",")[1]}
+                    x2={p(c + 1, r, h).split(",")[0]}
+                    y2={p(c + 1, r, h).split(",")[1]}
                     stroke="rgba(255,255,255,0.45)"
                     strokeWidth="1"
                   />
                   <line
-                    x1={p(c, r, h).split(",")[0]}   y1={p(c, r, h).split(",")[1]}
-                    x2={p(c, r+1, h).split(",")[0]} y2={p(c, r+1, h).split(",")[1]}
+                    x1={p(c, r, h).split(",")[0]}
+                    y1={p(c, r, h).split(",")[1]}
+                    x2={p(c, r + 1, h).split(",")[0]}
+                    y2={p(c, r + 1, h).split(",")[1]}
                     stroke="rgba(255,255,255,0.25)"
                     strokeWidth="0.8"
                   />
@@ -353,11 +405,11 @@ export default function IsometricScene({ onPlay }: Props) {
               boxShadow: "0 8px 24px rgba(0,0,0,0.18)",
               transition: "transform 0.15s, box-shadow 0.15s",
             }}
-            onMouseEnter={e => {
+            onMouseEnter={(e) => {
               e.currentTarget.style.transform = "translateY(-2px)"
               e.currentTarget.style.boxShadow = "0 12px 32px rgba(0,0,0,0.22)"
             }}
-            onMouseLeave={e => {
+            onMouseLeave={(e) => {
               e.currentTarget.style.transform = ""
               e.currentTarget.style.boxShadow = "0 8px 24px rgba(0,0,0,0.18)"
             }}

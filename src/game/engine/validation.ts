@@ -8,22 +8,32 @@ export interface ValidationResult {
 }
 
 export function getCluesInsideRectangle(
-  r0: number, c0: number, r1: number, c1: number,
-  clues: Clue[]
+  r0: number,
+  c0: number,
+  r1: number,
+  c1: number,
+  clues: Clue[],
 ): Clue[] {
-  return clues.filter(clue =>
-    clue.row >= r0 && clue.row <= r1 &&
-    clue.col >= c0 && clue.col <= c1
+  return clues.filter(
+    (clue) =>
+      clue.row >= r0 && clue.row <= r1 && clue.col >= c0 && clue.col <= c1,
   )
 }
 
 export function hasRegionOverlap(
-  r0: number, c0: number, r1: number, c1: number,
-  regions: Region[]
+  r0: number,
+  c0: number,
+  r1: number,
+  c1: number,
+  regions: Region[],
 ): boolean {
   for (const region of regions) {
-    if (r0 < region.row + region.height && r1 >= region.row &&
-        c0 < region.col + region.width && c1 >= region.col) {
+    if (
+      r0 < region.row + region.height &&
+      r1 >= region.row &&
+      c0 < region.col + region.width &&
+      c1 >= region.col
+    ) {
       return true
     }
   }
@@ -35,7 +45,7 @@ export function validateRectangle(
   clues: Clue[],
   regions: Region[],
   rows: number,
-  cols: number
+  cols: number,
 ): ValidationResult {
   const { r0, c0, r1, c1, area } = normalizeSelection(sel)
 

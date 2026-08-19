@@ -25,9 +25,13 @@ export default function ShikakuGame() {
       style={{
         display: "flex",
         flexDirection: "column",
-        height: "100dvh",
+        height: "100%",
         background: "#faf7f0",
         overflow: "hidden",
+        userSelect: "none",
+        WebkitUserSelect: "none",
+        touchAction: "none",
+        overscrollBehavior: "none",
         fontFamily: "'Outfit', sans-serif",
       }}
     >
@@ -80,14 +84,20 @@ export default function ShikakuGame() {
         <PauseModal onResume={game.resume} onRestart={game.restart} />
       )}
       {game.gameStatus === "completed" && (
-        <CompleteModal levelId={game.level.id} onReplay={goReplay} onNext={goNext} />
+        <CompleteModal
+          levelId={game.level.id}
+          onReplay={goReplay}
+          onNext={goNext}
+        />
       )}
     </div>
   )
 }
 
 function HintButton({
-  count, onHint, disabled,
+  count,
+  onHint,
+  disabled,
 }: {
   count: number
   onHint: () => void
@@ -104,7 +114,9 @@ function HintButton({
         padding: "10px 20px",
         borderRadius: 14,
         border: "1.5px solid rgba(0,0,0,0.1)",
-        background: disabled ? "rgba(255,255,255,0.4)" : "rgba(255,255,255,0.85)",
+        background: disabled
+          ? "rgba(255,255,255,0.4)"
+          : "rgba(255,255,255,0.85)",
         color: disabled ? "#c0ad9a" : "#6b5744",
         fontSize: 14,
         fontWeight: 600,
@@ -114,7 +126,13 @@ function HintButton({
         boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
       }}
     >
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" style={{ opacity: disabled ? 0.4 : 1 }}>
+      <svg
+        width="16"
+        height="16"
+        viewBox="0 0 16 16"
+        fill="currentColor"
+        style={{ opacity: disabled ? 0.4 : 1 }}
+      >
         <path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1Zm-.75 9.5V7.5h1.5v3h-1.5Zm.75-4.25a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5Z" />
       </svg>
       Hint
@@ -135,7 +153,13 @@ function HintButton({
   )
 }
 
-function UndoButton({ onUndo, disabled }: { onUndo: () => void; disabled: boolean }) {
+function UndoButton({
+  onUndo,
+  disabled,
+}: {
+  onUndo: () => void
+  disabled: boolean
+}) {
   return (
     <button
       onClick={onUndo}
@@ -146,7 +170,9 @@ function UndoButton({ onUndo, disabled }: { onUndo: () => void; disabled: boolea
         height: 44,
         borderRadius: 14,
         border: "1.5px solid rgba(0,0,0,0.1)",
-        background: disabled ? "rgba(255,255,255,0.4)" : "rgba(255,255,255,0.85)",
+        background: disabled
+          ? "rgba(255,255,255,0.4)"
+          : "rgba(255,255,255,0.85)",
         color: disabled ? "#c0ad9a" : "#6b5744",
         cursor: disabled ? "not-allowed" : "pointer",
         display: "flex",
@@ -156,7 +182,16 @@ function UndoButton({ onUndo, disabled }: { onUndo: () => void; disabled: boolea
         transition: "background 0.15s",
       }}
     >
-      <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <svg
+        width="18"
+        height="18"
+        viewBox="0 0 18 18"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
         <path d="M3 9a6 6 0 1 0 1.5-4L3 3v4h4" />
       </svg>
     </button>
