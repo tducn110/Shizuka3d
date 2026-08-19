@@ -1,5 +1,5 @@
 import type { Clue, Region, Selection } from "../types/shikaku.types"
-import { normalizeSelection, getRectangleCells } from "./rectangle"
+import { normalizeSelection } from "./rectangle"
 
 export interface ValidationResult {
   valid: boolean
@@ -21,14 +21,12 @@ export function hasRegionOverlap(
   r0: number, c0: number, r1: number, c1: number,
   regions: Region[]
 ): boolean {
-  const occupied = new Set<string>()
   for (const region of regions) {
-    for (let r = region.row; r < region.row + region.height; r++)
-      for (let c = region.col; c < region.col + region.width; c++)
-        occupied.add(`${r},${c}`)
+    if (r0 < region.row + region.height && r1 >= region.row &&
+        c0 < region.col + region.width && c1 >= region.col) {
+      return true
+    }
   }
-  for (const [r, c] of getRectangleCells(r0, c0, r1, c1))
-    if (occupied.has(`${r},${c}`)) return true
   return false
 }
 
