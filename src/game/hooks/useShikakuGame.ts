@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react"
+import React, { useState, useCallback } from "react"
 import type {
   Level,
   Region,
@@ -30,7 +30,6 @@ const PASTEL_COLORS = [
 ]
 
 const INITIAL_HINTS = 3
-let regionCounter = 0
 
 export function useShikakuGame(initialLevel: Level) {
   const [level, setLevel] = useState<Level>(initialLevel)
@@ -40,6 +39,19 @@ export function useShikakuGame(initialLevel: Level) {
   const [gameStatus, setGameStatus] = useState<GameStatus>("playing")
   const [hintRegion, setHintRegion] = useState<RegionDef | null>(null)
   const [colorIndex, setColorIndex] = useState(0)
+  const [boardRevision, setBoardRevision] = useState(0)
+  const regionCounterRef = React.useRef(0)
+  const hintTimerRef = React.useRef<NodeJS.Timeout | null>(null)
+
+  // Clear timer on unmount and pause on background
+  React.useEffect(() => {
+    const onVis = () => document.hidden && setGameStatus("paused")
+    document.addEventListener("visibilitychange", onVis)
+    return () => {
+      document.removeEventListener("visibilitychange", onVis)
+      if (hintTimerRef.current) clearTimeout(hintTimerRef.current)
+    }
+  }, [])
 
   const placeRegion = useCallback(
     (sel: Selection): boolean => {
@@ -53,7 +65,7 @@ export function useShikakuGame(initialLevel: Level) {
       if (!result.valid || !result.clue) return false
 
       const { r0, c0, r1, c1 } = normalizeSelection(sel)
-      const id = `region-${++regionCounter}`
+      const id = `region-${++regionCounterRef.current}`
       const color = PASTEL_COLORS[colorIndex % PASTEL_COLORS.length]
 
       const newRegion: Region = {
@@ -89,9 +101,12 @@ export function useShikakuGame(initialLevel: Level) {
   const undo = useCallback(() => {
     setHistory((h) => {
       if (h.length === 0) return h
-      const lastId = h[h.length - 1]
-      setRegions((r) => r.filter((reg) => reg.id !== lastId))
       return h.slice(0, -1)
+    })
+    setRegions((r) => {
+      if (r.length === 0) return r
+      // The last placed region is just the last in the array since we only append
+      return r.slice(0, -1)
     })
   }, [])
 
@@ -101,19 +116,28 @@ export function useShikakuGame(initialLevel: Level) {
     if (!hint) return
     setHintCount((n) => n - 1)
     setHintRegion(hint)
-    setTimeout(() => setHintRegion(null), 1800)
+    if (hintTimerRef.current) clearTimeout(hintTimerRef.current)
+    hintTimerRef.current = setTimeout(() => {
+      setHintRegion(null)
+      hintTimerRef.current = null
+    }, 1800)
   }, [hintCount, level, regions])
 
   const restart = useCallback(() => {
+    if (hintTimerRef.current) clearTimeout(hintTimerRef.current)
+    hintTimerRef.current = null
     setRegions([])
     setHistory([])
     setHintCount(INITIAL_HINTS)
     setGameStatus("playing")
     setHintRegion(null)
     setColorIndex(0)
+    setBoardRevision((revision) => revision + 1)
   }, [])
 
   const loadLevel = useCallback((newLevel: Level) => {
+    if (hintTimerRef.current) clearTimeout(hintTimerRef.current)
+    hintTimerRef.current = null
     setLevel(newLevel)
     setRegions([])
     setHistory([])
@@ -121,6 +145,7 @@ export function useShikakuGame(initialLevel: Level) {
     setGameStatus("playing")
     setHintRegion(null)
     setColorIndex(0)
+    setBoardRevision((revision) => revision + 1)
   }, [])
 
   const pause = useCallback(() => setGameStatus("paused"), [])
@@ -133,6 +158,7 @@ export function useShikakuGame(initialLevel: Level) {
     hintCount,
     gameStatus,
     hintRegion,
+    boardRevision,
     placeRegion,
     removeRegion,
     undo,

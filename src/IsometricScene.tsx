@@ -1,17 +1,9 @@
 import { useEffect, useRef, useState, useMemo, useCallback } from "react"
 import {
-  useCameraRotation,
   formatPt,
   project3D,
+  useCameraRotation,
 } from "./game/hooks/useCameraRotation"
-import {
-  Camera,
-  RotateCcw,
-  RotateCw,
-  Pause,
-  Play,
-  RefreshCw,
-} from "lucide-react"
 
 // ── Grid units and scale ───────────────────────────────────────────────────
 const S = 48 // pixels per grid unit
@@ -54,13 +46,12 @@ interface Props {
 }
 
 export default function IsometricScene({ onPlay }: Props) {
-  // Camera rotation hook with automatic sway ("quay qua quay lại")
-  const { angle, isSwaying, toggleSway, rotateLeft, rotateRight, resetCamera } =
-    useCameraRotation({
-      autoSway: true,
-      swaySpeed: 0.85,
-      swayAmplitude: 0.42,
-    })
+  // Keep the intro's ambient camera sway without exposing a control panel.
+  const { angle } = useCameraRotation({
+    autoSway: true,
+    swaySpeed: 0.85,
+    swayAmplitude: 0.42,
+  })
 
   // Center of 7x7 grid
   const xc = 3.5
@@ -156,83 +147,6 @@ export default function IsometricScene({ onPlay }: Props) {
         position: "relative",
       }}
     >
-      {/* ── Camera Rotation Control Toolbar ────────────────────────────── */}
-      <div
-        style={{
-          position: "absolute",
-          top: 24,
-          zIndex: 20,
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          background: "rgba(255, 255, 255, 0.75)",
-          backdropFilter: "blur(12px)",
-          WebkitBackdropFilter: "blur(12px)",
-          padding: "8px 16px",
-          borderRadius: 24,
-          border: "1px solid rgba(0, 0, 0, 0.08)",
-          boxShadow: "0 8px 32px rgba(0,0,0,0.08)",
-        }}
-      >
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 6,
-            marginRight: 8,
-            color: "#4a3b32",
-            fontWeight: 600,
-            fontSize: 13,
-          }}
-        >
-          <Camera size={16} />
-          <span>Camera Control</span>
-        </div>
-
-        <button
-          onClick={rotateLeft}
-          title="Quay trái (Rotate Left)"
-          style={btnStyle}
-        >
-          <RotateCcw size={15} />
-        </button>
-
-        <button
-          onClick={toggleSway}
-          title={
-            isSwaying
-              ? "Tắt quay qua quay lại"
-              : "Bật quay qua quay lại (Auto Sway)"
-          }
-          style={{
-            ...btnStyle,
-            background: isSwaying ? "#2e2016" : "rgba(0,0,0,0.05)",
-            color: isSwaying ? "#faf7f0" : "#2e2016",
-          }}
-        >
-          {isSwaying ? <Pause size={15} /> : <Play size={15} />}
-          <span style={{ fontSize: 12, fontWeight: 600, marginLeft: 4 }}>
-            {isSwaying ? "Quay qua lại ON" : "Quay qua lại OFF"}
-          </span>
-        </button>
-
-        <button
-          onClick={rotateRight}
-          title="Quay phải (Rotate Right)"
-          style={btnStyle}
-        >
-          <RotateCw size={15} />
-        </button>
-
-        <button
-          onClick={resetCamera}
-          title="Đặt lại camera (Reset Camera)"
-          style={btnStyle}
-        >
-          <RefreshCw size={14} />
-        </button>
-      </div>
-
       {/* ── Isometric SVG scene ─────────────────────────────────────── */}
       <div
         style={{ position: "relative", width: "100%", flex: 1, minHeight: 0 }}
@@ -420,17 +334,4 @@ export default function IsometricScene({ onPlay }: Props) {
       </div>
     </div>
   )
-}
-
-const btnStyle: React.CSSProperties = {
-  display: "inline-flex",
-  alignItems: "center",
-  justifyContent: "center",
-  padding: "6px 10px",
-  borderRadius: 12,
-  border: "none",
-  background: "rgba(0, 0, 0, 0.05)",
-  color: "#2e2016",
-  cursor: "pointer",
-  transition: "all 0.15s ease",
 }

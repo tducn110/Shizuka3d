@@ -7,9 +7,13 @@
     "dev": "vite --host 0.0.0.0",
     "build": "vite build",
     "preview": "vite preview",
-    "format": "oxfmt"
+    "format": "oxfmt",
+    "test": "tsx tests/rules.test.ts",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@react-three/drei": "^10.7.8",
+    "@react-three/fiber": "^9.7.0",
     "@types/three": "^0.185.4",
     "lucide-react": "^1.31.0",
     "react": "^19.0.0",
@@ -24,6 +28,7 @@
     "@vitejs/plugin-react": "^6.0.0",
     "oxfmt": "^0.2.0",
     "tailwindcss": "^4.0.0",
+    "tsx": "^4.23.12",
     "typescript": "^5.7.0",
     "vite": "^8.0.0"
   }

@@ -1,6 +1,5 @@
 import type { Level, Clue, RegionDef } from "../types/shikaku.types"
 
-// Seeded LCG — deterministic, reproducible per seed
 function makeLcg(seed: number) {
   let s = seed >>> 0
   return (): number => {
@@ -18,8 +17,6 @@ function shuffle<T>(arr: T[], rng: () => number): T[] {
   return a
 }
 
-// Recursively partition the board into rectangles.
-// minArea=2 prevents 1×1 clue cells (which can't be drawn by dragging).
 function partition(
   rows: number,
   cols: number,
@@ -77,14 +74,7 @@ function placeClues(solution: RegionDef[], rng: () => number): Clue[] {
   }))
 }
 
-interface Spec {
-  rows: number
-  cols: number
-  maxArea: number
-  stopProb: number
-}
-
-function specFor(i: number): Spec {
+function specFor(i: number) {
   if (i < 10) return { rows: 5, cols: 5, maxArea: 6, stopProb: 0.55 }
   if (i < 20) return { rows: 5, cols: 6, maxArea: 7, stopProb: 0.5 }
   if (i < 30) return { rows: 6, cols: 6, maxArea: 8, stopProb: 0.47 }
@@ -97,11 +87,31 @@ function specFor(i: number): Spec {
   return { rows: 9, cols: 10, maxArea: 15, stopProb: 0.29 }
 }
 
+// Precomputed seeds that yield exactly one valid solution.
+const UNIQUE_SEEDS = [
+  3735928559, 2095397032, 473954248, 3166567503, 1468769747, 4123205516,
+  2520851475, 899408691, 3496578231, 1856046704, 272781406, 2869950946,
+  1229419419, 3883855188, 2243323661, 621880877, 3257227903, 1616696376,
+  14342335, 2649689361, 990069091, 3663593603, 2042150819, 363441806,
+  3017877575, 1377346048, 4050870560, 2391250290, 884339964, 3481509504,
+  1802800491, 181357707, 3007592163, 1157084463, 3830608975, 2151899962,
+  511368435, 3165804204, 1525272677, 4217885932, 2539176919, 917734135,
+  3553081161, 1969815863, 310195593, 3060075077, 1324099835, 3940358118,
+  2318915334, 754738779, 3313730833, 1730465535, 147200237, 2706192291,
+  1103838250, 3796451505, 2079565006, 439033479, 3074380505, 1510203950,
+  4126462233, 2447753220, 940842894, 3518923691, 1897480907, 218771894,
+  2930473892, 1461741052, 3868023162, 2208402892, 606048851, 3260484620,
+  1715396808, 55776538, 2595679849, 993325808, 3609584091, 2179028737,
+  366698523, 2982956806, 1418780251, 217289813, 2394507007, 773064223,
+  3599298679, 1806057208, 127348195, 2896316422, 1542116040, 4024753122,
+  2116979193, 743690068, 3169060921, 1528529394, 4221142649, 2618788608,
+  863724623, 3613604107, 1934895094, 275274824,
+]
+
 function makeLevel(id: number): Level {
   const i = id - 1
   const { rows, cols, maxArea, stopProb } = specFor(i)
-  // Spread seeds across the 32-bit space using Knuth multiplicative hashing
-  const seed = (0xdeadbeef + i * 0x9e3779b9) >>> 0
+  const seed = UNIQUE_SEEDS[i]
   const rng = makeLcg(seed)
   const solution = partition(rows, cols, maxArea, stopProb, rng)
   const clues = placeClues(solution, rng)

@@ -1,23 +1,33 @@
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { LEVELS } from "./data/levels"
 import { useShikakuGame } from "./hooks/useShikakuGame"
 import GameHUD from "./components/GameHUD"
 import IsometricBoard from "./components/IsometricBoard"
 import PauseModal from "./components/PauseModal"
 import CompleteModal from "./components/CompleteModal"
+import { showInterstitial } from "../integrations/ads/googleH5Ads"
 
 export default function ShikakuGame() {
   const [levelIndex, setLevelIndex] = useState(0)
+  const transitionPendingRef = useRef(false)
   const game = useShikakuGame(LEVELS[levelIndex])
 
-  const goNext = () => {
+  const goNext = async () => {
+    if (transitionPendingRef.current) return
+    transitionPendingRef.current = true
+    await showInterstitial({ type: "next", name: "next_shikaku_level" })
     const next = (levelIndex + 1) % LEVELS.length
     setLevelIndex(next)
     game.loadLevel(LEVELS[next])
+    transitionPendingRef.current = false
   }
 
-  const goReplay = () => {
+  const goReplay = async () => {
+    if (transitionPendingRef.current) return
+    transitionPendingRef.current = true
+    await showInterstitial({ type: "next", name: "replay_shikaku_level" })
     game.restart()
+    transitionPendingRef.current = false
   }
 
   return (
@@ -33,6 +43,10 @@ export default function ShikakuGame() {
         touchAction: "none",
         overscrollBehavior: "none",
         fontFamily: "'Outfit', sans-serif",
+        paddingTop: "env(safe-area-inset-top)",
+        paddingBottom: "env(safe-area-inset-bottom)",
+        paddingLeft: "env(safe-area-inset-left)",
+        paddingRight: "env(safe-area-inset-right)",
       }}
     >
       <GameHUD levelId={game.level.id} onPause={game.pause} />
@@ -52,6 +66,7 @@ export default function ShikakuGame() {
           level={game.level}
           regions={game.regions}
           hintRegion={game.hintRegion}
+          boardRevision={game.boardRevision}
           gameStatus={game.gameStatus}
           onPlaceRegion={game.placeRegion}
           onRemoveRegion={game.removeRegion}
