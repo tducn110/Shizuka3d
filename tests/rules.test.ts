@@ -1,5 +1,5 @@
-import { isBoardComplete } from "../src/game/engine/completion"
-import { validateRectangle } from "../src/game/engine/validation"
+import { isBoardComplete } from "../src/behaviors/match/completion"
+import { validateRectangle } from "../src/behaviors/play-move/moveValidation"
 
 function assert(condition: boolean, msg: string) {
   if (!condition) throw new Error(msg)

@@ -1,9 +1,13 @@
+import Button from "../../ui/components/Button"
+import { useTranslation } from "react-i18next"
+
 interface Props {
   levelId: number
   onPause: () => void
 }
 
 export default function GameHUD({ levelId, onPause }: Props) {
+  const { t } = useTranslation()
   return (
     <div
       style={{
@@ -29,34 +33,12 @@ export default function GameHUD({ levelId, onPause }: Props) {
         Level {levelId}
       </div>
 
-      <button
-        onClick={onPause}
-        aria-label="Pause"
-        style={{
-          width: 38,
-          height: 38,
-          borderRadius: 10,
-          border: "1.5px solid rgba(0,0,0,0.1)",
-          background: "rgba(255,255,255,0.7)",
-          cursor: "pointer",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          transition: "background 0.15s",
-          color: "#6b5744",
-        }}
-        onMouseEnter={(e) =>
-          (e.currentTarget.style.background = "rgba(255,255,255,0.95)")
-        }
-        onMouseLeave={(e) =>
-          (e.currentTarget.style.background = "rgba(255,255,255,0.7)")
-        }
-      >
+      <Button variant="icon" onClick={onPause} aria-label={t("common.pause")}>
         <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
           <rect x="3" y="2" width="3.5" height="12" rx="1.5" />
           <rect x="9.5" y="2" width="3.5" height="12" rx="1.5" />
         </svg>
-      </button>
+      </Button>
     </div>
   )
 }

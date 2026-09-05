@@ -1,4 +1,4 @@
-import type { Level, Region, RegionDef } from "../types/shikaku.types"
+import type { Level, Region, RegionDef } from "../../core/types"
 
 export function getHintRegion(
   level: Level,

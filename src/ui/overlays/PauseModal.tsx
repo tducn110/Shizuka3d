@@ -1,9 +1,16 @@
+import Button from "../../ui/components/Button"
+import { useTranslation } from "react-i18next"
+
 interface Props {
   onResume: () => void
   onRestart: () => void
 }
 
 export default function PauseModal({ onResume, onRestart }: Props) {
+  const { t, i18n } = useTranslation()
+  const currentLanguage = i18n.resolvedLanguage?.startsWith("en") ? "en" : "vi"
+  const nextLanguage = currentLanguage === "vi" ? "en" : "vi"
+
   return (
     <div
       style={{
@@ -43,44 +50,15 @@ export default function PauseModal({ onResume, onRestart }: Props) {
             letterSpacing: "-0.01em",
           }}
         >
-          Paused
+          {t("common.pause")}
         </div>
 
-        <Btn label="Resume" onClick={onResume} primary />
-        <Btn label="Restart" onClick={onRestart} />
+        <Button variant="secondary" onClick={() => void i18n.changeLanguage(nextLanguage)}>
+          {t("settings.language")}: {nextLanguage.toUpperCase()}
+        </Button>
+        <Button variant="primary" onClick={onResume}>{t("common.resume")}</Button>
+        <Button variant="secondary" onClick={onRestart}>{t("common.retry")}</Button>
       </div>
     </div>
-  )
-}
-
-function Btn({
-  label,
-  onClick,
-  primary,
-}: {
-  label: string
-  onClick: () => void
-  primary?: boolean
-}) {
-  return (
-    <button
-      onClick={onClick}
-      style={{
-        padding: "12px 0",
-        borderRadius: 12,
-        border: primary ? "none" : "1.5px solid rgba(0,0,0,0.12)",
-        background: primary ? "#2e2016" : "transparent",
-        color: primary ? "#fffdf8" : "#6b5744",
-        fontSize: 15,
-        fontWeight: 600,
-        fontFamily: "'Outfit', sans-serif",
-        cursor: "pointer",
-        transition: "opacity 0.15s",
-      }}
-      onMouseEnter={(e) => (e.currentTarget.style.opacity = "0.82")}
-      onMouseLeave={(e) => (e.currentTarget.style.opacity = "1")}
-    >
-      {label}
-    </button>
   )
 }

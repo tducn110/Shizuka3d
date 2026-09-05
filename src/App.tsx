@@ -1,10 +1,10 @@
 import { useState } from "react"
-import IsometricScene from "./IsometricScene"
-import ShikakuGame from "./game/ShikakuGame"
+import IntroScreen from "./screens/IntroScreen"
+import GameScreen from "./screens/GameScreen"
 
 export default function App() {
   const [view, setView] = useState<"intro" | "game">("intro")
 
-  if (view === "game") return <ShikakuGame />
-  return <IsometricScene onPlay={() => setView("game")} />
+  if (view === "game") return <GameScreen />
+  return <IntroScreen onPlay={() => setView("game")} />
 }

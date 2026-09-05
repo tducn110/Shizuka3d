@@ -1,4 +1,4 @@
-import type { Level, Region } from "../types/shikaku.types"
+import type { Level, Region } from "../../core/types"
 
 export function isBoardComplete(level: Level, regions: Region[]): boolean {
   if (regions.length !== level.clues.length) return false

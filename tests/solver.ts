@@ -1,4 +1,4 @@
-import { LEVELS } from "../src/game/data/levels"
+import { LEVELS } from "../src/data/levels"
 
 function solve(level: any): number {
   const { rows, cols, clues } = level

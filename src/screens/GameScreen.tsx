@@ -1,16 +1,32 @@
-import { useRef, useState } from "react"
-import { LEVELS } from "./data/levels"
-import { useShikakuGame } from "./hooks/useShikakuGame"
-import GameHUD from "./components/GameHUD"
-import IsometricBoard from "./components/IsometricBoard"
-import PauseModal from "./components/PauseModal"
-import CompleteModal from "./components/CompleteModal"
+import { useRef, useState, useEffect } from "react"
+import { LEVELS } from "../data/levels"
+import { useMatchController } from "../behaviors/match/MatchController"
+import { usePlayMoveController } from "../behaviors/play-move/PlayMoveController"
+import { useHintController } from "../behaviors/hint-system/HintController"
+import GameHUD from "../ui/gameplay/GameHUD"
+import IsometricBoard from "../behaviors/board-rendering/IsometricBoard"
+import PauseModal from "../ui/overlays/PauseModal"
+import CompleteModal from "../ui/overlays/CompleteModal"
 import { showInterstitial } from "../integrations/ads/googleH5Ads"
 
-export default function ShikakuGame() {
+export default function GameScreen() {
   const [levelIndex, setLevelIndex] = useState(0)
   const transitionPendingRef = useRef(false)
-  const game = useShikakuGame(LEVELS[levelIndex])
+  
+  // 1. Match Lifecycle Behavior
+  const match = useMatchController(LEVELS[levelIndex])
+  
+  // 2. Play Move Behavior
+  const playMove = usePlayMoveController(match.level, match.complete)
+  
+  // 3. Hint System Behavior
+  const hints = useHintController(match.level, playMove.regions)
+
+  // Sync behaviors on match.boardRevision change (when level is loaded or restarted)
+  useEffect(() => {
+    playMove.clear()
+    hints.clear()
+  }, [match.boardRevision])
 
   const goNext = async () => {
     if (transitionPendingRef.current) return
@@ -18,7 +34,7 @@ export default function ShikakuGame() {
     await showInterstitial({ type: "next", name: "next_shikaku_level" })
     const next = (levelIndex + 1) % LEVELS.length
     setLevelIndex(next)
-    game.loadLevel(LEVELS[next])
+    match.loadLevel(LEVELS[next])
     transitionPendingRef.current = false
   }
 
@@ -26,7 +42,7 @@ export default function ShikakuGame() {
     if (transitionPendingRef.current) return
     transitionPendingRef.current = true
     await showInterstitial({ type: "next", name: "replay_shikaku_level" })
-    game.restart()
+    match.restart()
     transitionPendingRef.current = false
   }
 
@@ -49,7 +65,7 @@ export default function ShikakuGame() {
         paddingRight: "env(safe-area-inset-right)",
       }}
     >
-      <GameHUD levelId={game.level.id} onPause={game.pause} />
+      <GameHUD levelId={match.level.id} onPause={match.pause} />
 
       {/* Board area */}
       <div
@@ -63,13 +79,13 @@ export default function ShikakuGame() {
         }}
       >
         <IsometricBoard
-          level={game.level}
-          regions={game.regions}
-          hintRegion={game.hintRegion}
-          boardRevision={game.boardRevision}
-          gameStatus={game.gameStatus}
-          onPlaceRegion={game.placeRegion}
-          onRemoveRegion={game.removeRegion}
+          level={match.level}
+          regions={playMove.regions}
+          hintRegion={hints.hintRegion}
+          boardRevision={match.boardRevision}
+          gameStatus={match.status}
+          onPlaceRegion={playMove.placeRegion}
+          onRemoveRegion={playMove.removeRegion}
         />
       </div>
 
@@ -85,22 +101,22 @@ export default function ShikakuGame() {
         }}
       >
         <HintButton
-          count={game.hintCount}
-          onHint={game.showHint}
-          disabled={game.gameStatus !== "playing" || game.hintCount === 0}
+          count={hints.hintCount}
+          onHint={hints.showHint}
+          disabled={match.status !== "playing" || hints.hintCount === 0}
         />
         <UndoButton
-          onUndo={game.undo}
-          disabled={game.history.length === 0 || game.gameStatus !== "playing"}
+          onUndo={playMove.undo}
+          disabled={playMove.history.length === 0 || match.status !== "playing"}
         />
       </div>
 
-      {game.gameStatus === "paused" && (
-        <PauseModal onResume={game.resume} onRestart={game.restart} />
+      {match.status === "paused" && (
+        <PauseModal onResume={match.resume} onRestart={match.restart} />
       )}
-      {game.gameStatus === "completed" && (
+      {match.status === "completed" && (
         <CompleteModal
-          levelId={game.level.id}
+          levelId={match.level.id}
           onReplay={goReplay}
           onNext={goNext}
         />

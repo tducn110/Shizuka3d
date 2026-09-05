@@ -2,9 +2,9 @@ import { Canvas, useThree } from "@react-three/fiber"
 import { OrbitControls, Text } from "@react-three/drei"
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import * as THREE from "three"
-import type { GameStatus, Level, Region, RegionDef, Selection } from "../types/shikaku.types"
-import { normalizeSelection } from "../engine/rectangle"
-import { createBoardBounds, frameBoard, projectBounds } from "./framing"
+import type { GameStatus, Level, Region, RegionDef, Selection } from "../../core/types"
+import { normalizeSelection } from "../../core/geometry"
+import { createBoardBounds, frameBoard, projectBounds } from "../board-navigation/framing"
 
 const MAT_OCCUPIED = new THREE.MeshStandardMaterial({ color: "#ece4d4", roughness: 0.9 })
 const MAT_FREE = new THREE.MeshStandardMaterial({ color: "#f5f0e6", roughness: 0.9 })

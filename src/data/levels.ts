@@ -1,4 +1,4 @@
-import type { Level, Clue, RegionDef } from "../types/shikaku.types"
+import type { Level, Clue, RegionDef } from "../core/types"
 
 function makeLcg(seed: number) {
   let s = seed >>> 0

@@ -1,4 +1,4 @@
-import type { NormalizedRect, Selection } from "../types/shikaku.types"
+import type { NormalizedRect, Selection } from "./types"
 
 export function normalizeSelection(sel: Selection): NormalizedRect {
   const r0 = Math.min(sel.startRow, sel.endRow)

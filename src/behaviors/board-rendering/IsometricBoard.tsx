@@ -1,5 +1,5 @@
-import type { GameStatus, Level, Region, RegionDef, Selection } from "../types/shikaku.types"
-import Board3DViewport from "../board3d/Board3DViewport"
+import type { GameStatus, Level, Region, RegionDef, Selection } from "../../core/types"
+import Board3DViewport from "./Board3DViewport"
 
 interface Props {
   level: Level

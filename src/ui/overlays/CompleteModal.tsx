@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react"
+import Button from "../../ui/components/Button"
 
 interface Props {
   levelId: number
@@ -63,40 +64,12 @@ export default function CompleteModal({ levelId, onReplay, onNext }: Props) {
         </div>
 
         <div style={{ display: "flex", gap: 10, width: "100%" }}>
-          <button
-            onClick={onReplay}
-            style={{
-              flex: 1,
-              padding: "12px 0",
-              borderRadius: 12,
-              border: "1.5px solid rgba(0,0,0,0.12)",
-              background: "transparent",
-              color: "#6b5744",
-              fontSize: 14,
-              fontWeight: 600,
-              fontFamily: "'Outfit', sans-serif",
-              cursor: "pointer",
-            }}
-          >
+          <Button variant="secondary" onClick={onReplay} style={{ flex: 1, fontSize: 14 }}>
             Replay
-          </button>
-          <button
-            onClick={onNext}
-            style={{
-              flex: 1,
-              padding: "12px 0",
-              borderRadius: 12,
-              border: "none",
-              background: "#2e2016",
-              color: "#fffdf8",
-              fontSize: 14,
-              fontWeight: 600,
-              fontFamily: "'Outfit', sans-serif",
-              cursor: "pointer",
-            }}
-          >
+          </Button>
+          <Button variant="primary" onClick={onNext} style={{ flex: 1, fontSize: 14 }}>
             Next →
-          </button>
+          </Button>
         </div>
       </div>
     </div>

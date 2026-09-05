@@ -1,5 +1,5 @@
-import type { Clue, Region, Selection } from "../types/shikaku.types"
-import { normalizeSelection } from "./rectangle"
+import type { Clue, Region, Selection } from "../../core/types"
+import { normalizeSelection } from "../../core/geometry"
 
 export interface ValidationResult {
   valid: boolean

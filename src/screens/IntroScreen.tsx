@@ -3,7 +3,9 @@ import {
   formatPt,
   project3D,
   useCameraRotation,
-} from "./game/hooks/useCameraRotation"
+} from "../behaviors/board-navigation/useCameraRotation"
+
+import Button from "../ui/components/Button"
 
 // ── Grid units and scale ───────────────────────────────────────────────────
 const S = 48 // pixels per grid unit
@@ -45,7 +47,7 @@ interface Props {
   onPlay?: () => void
 }
 
-export default function IsometricScene({ onPlay }: Props) {
+export default function IntroScreen({ onPlay }: Props) {
   // Keep the intro's ambient camera sway without exposing a control panel.
   const { angle } = useCameraRotation({
     autoSway: true,
@@ -301,35 +303,9 @@ export default function IsometricScene({ onPlay }: Props) {
           Shikaku 3D
         </h1>
         {onPlay && (
-          <button
-            onClick={onPlay}
-            style={{
-              marginTop: 8,
-              padding: "14px 40px",
-              borderRadius: 16,
-              border: "none",
-              background: "#2e2016",
-              color: "#faf7f0",
-              fontSize: 16,
-              fontWeight: 700,
-              fontFamily: "'Outfit', sans-serif",
-              letterSpacing: "0.01em",
-              cursor: "pointer",
-              pointerEvents: "all",
-              boxShadow: "0 8px 24px rgba(0,0,0,0.18)",
-              transition: "transform 0.15s, box-shadow 0.15s",
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.transform = "translateY(-2px)"
-              e.currentTarget.style.boxShadow = "0 12px 32px rgba(0,0,0,0.22)"
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.transform = ""
-              e.currentTarget.style.boxShadow = "0 8px 24px rgba(0,0,0,0.18)"
-            }}
-          >
+          <Button variant="hero" onClick={onPlay} style={{ marginTop: 8 }}>
             Play Game →
-          </button>
+          </Button>
         )}
       </div>
     </div>

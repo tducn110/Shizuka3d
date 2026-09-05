@@ -1,4 +1,4 @@
-import { LEVELS } from "../src/game/data/levels"
+import { LEVELS } from "../src/data/levels"
 // We'll write a quick script to find seeds
 import fs from "fs"
 
