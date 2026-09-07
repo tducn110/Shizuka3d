@@ -4,7 +4,8 @@ import { initReactI18next } from "react-i18next";
 const LANGUAGE_STORAGE_KEY = "fruit-slashing-language";
 type SupportedLanguage = "vi" | "en";
 const isSupportedLanguage = (value: string | null): value is SupportedLanguage => value === "vi" || value === "en";
-const getInitialLanguage = (): SupportedLanguage => { if (typeof window === "undefined") return "vi"; try { const value = window.localStorage.getItem(LANGUAGE_STORAGE_KEY); return isSupportedLanguage(value) ? value : "vi"; } catch { return "vi"; } };
+const DEFAULT_LANGUAGE: SupportedLanguage = "en";
+const getInitialLanguage = (): SupportedLanguage => { if (typeof window === "undefined") return DEFAULT_LANGUAGE; try { const value = window.localStorage.getItem(LANGUAGE_STORAGE_KEY); return isSupportedLanguage(value) ? value : DEFAULT_LANGUAGE; } catch { return DEFAULT_LANGUAGE; } };
 const persistLanguage = (language: string): void => { const normalized = language.split("-")[0]; if (typeof window === "undefined" || !isSupportedLanguage(normalized)) return; try { window.localStorage.setItem(LANGUAGE_STORAGE_KEY, normalized); } catch { /* Optional persistence. */ } };
 
 const resources = {
@@ -56,7 +57,7 @@ void i18n
     resources,
     lng: getInitialLanguage(),
     supportedLngs: ["vi", "en"],
-    fallbackLng: "vi",
+    fallbackLng: DEFAULT_LANGUAGE,
     interpolation: { escapeValue: false },
   });
 i18n.on("languageChanged", persistLanguage);
