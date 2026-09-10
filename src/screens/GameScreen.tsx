@@ -8,10 +8,12 @@ import IsometricBoard from "../behaviors/board-rendering/IsometricBoard"
 import PauseModal from "../ui/overlays/PauseModal"
 import CompleteModal from "../ui/overlays/CompleteModal"
 import { showInterstitial } from "../integrations/ads/googleH5Ads"
+import { useWinkIntegration } from "../integrations/wink/useWinkIntegration"
 
 export default function GameScreen() {
   const [levelIndex, setLevelIndex] = useState(0)
   const transitionPendingRef = useRef(false)
+  const wink = useWinkIntegration()
   
   // 1. Match Lifecycle Behavior
   const match = useMatchController(LEVELS[levelIndex])
@@ -21,6 +23,32 @@ export default function GameScreen() {
   
   // 3. Hint System Behavior
   const hints = useHintController(match.level, playMove.regions)
+
+  // Start gameplay on mount, stop on unmount
+  useEffect(() => {
+    wink.gameplayStart()
+    return () => {
+      wink.gameplayStop()
+    }
+  }, [])
+
+  // Handle completion
+  useEffect(() => {
+    if (match.status === "completed") {
+      wink.gameplayStop()
+      wink.submitFinalScore({ score: match.level.id * 100 })
+      wink.track("puzzle_complete", { level: match.level.id })
+    }
+  }, [match.status, match.level.id])
+
+  // React to host pause / resume
+  useEffect(() => {
+    if (wink.hostPaused && match.status === "playing") {
+      match.pause()
+    } else if (!wink.hostPaused && match.status === "paused") {
+      match.resume()
+    }
+  }, [wink.hostPaused, match.status])
 
   // Sync behaviors on match.boardRevision change (when level is loaded or restarted)
   useEffect(() => {
@@ -35,6 +63,7 @@ export default function GameScreen() {
     const next = (levelIndex + 1) % LEVELS.length
     setLevelIndex(next)
     match.loadLevel(LEVELS[next])
+    wink.gameplayStart()
     transitionPendingRef.current = false
   }
 
@@ -43,6 +72,7 @@ export default function GameScreen() {
     transitionPendingRef.current = true
     await showInterstitial({ type: "next", name: "replay_shikaku_level" })
     match.restart()
+    wink.gameplayStart()
     transitionPendingRef.current = false
   }
 
