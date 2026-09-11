@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect } from "react"
+import { useRef, useState, useEffect, useCallback } from "react"
 import { LEVELS } from "../data/levels"
 import { useMatchController } from "../behaviors/match/MatchController"
 import { usePlayMoveController } from "../behaviors/play-move/PlayMoveController"
@@ -18,28 +18,51 @@ export default function GameScreen() {
   // 1. Match Lifecycle Behavior
   const match = useMatchController(LEVELS[levelIndex])
   
+  const roundStartedRef = useRef(false)
+  
   // 2. Play Move Behavior
   const playMove = usePlayMoveController(match.level, match.complete)
   
   // 3. Hint System Behavior
   const hints = useHintController(match.level, playMove.regions)
 
-  // Start gameplay on mount, stop on unmount
-  useEffect(() => {
-    wink.gameplayStart()
-    return () => {
-      wink.gameplayStop()
+  const handlePlaceRegion = useCallback((region: any) => {
+    if (!roundStartedRef.current) {
+      wink.gameplayStart()
+      roundStartedRef.current = true
     }
-  }, [])
+    return playMove.placeRegion(region)
+  }, [wink, playMove])
+
+  const handleRemoveRegion = useCallback((id: string) => {
+    if (!roundStartedRef.current) {
+      wink.gameplayStart()
+      roundStartedRef.current = true
+    }
+    playMove.removeRegion(id)
+  }, [wink, playMove])
+
+  // Stop round on unmount if active
+  useEffect(() => {
+    return () => {
+      if (roundStartedRef.current) {
+        wink.gameplayStop()
+        roundStartedRef.current = false
+      }
+    }
+  }, [wink])
 
   // Handle completion
   useEffect(() => {
     if (match.status === "completed") {
-      wink.gameplayStop()
+      if (roundStartedRef.current) {
+        wink.gameplayStop()
+        roundStartedRef.current = false
+      }
       wink.submitFinalScore({ score: match.level.id * 100 })
       wink.track("puzzle_complete", { level: match.level.id })
     }
-  }, [match.status, match.level.id])
+  }, [match.status, match.level.id, wink])
 
   // React to host pause / resume
   useEffect(() => {
@@ -63,7 +86,7 @@ export default function GameScreen() {
     const next = (levelIndex + 1) % LEVELS.length
     setLevelIndex(next)
     match.loadLevel(LEVELS[next])
-    wink.gameplayStart()
+    roundStartedRef.current = false
     transitionPendingRef.current = false
   }
 
@@ -72,7 +95,7 @@ export default function GameScreen() {
     transitionPendingRef.current = true
     await showInterstitial({ type: "next", name: "replay_shikaku_level" })
     match.restart()
-    wink.gameplayStart()
+    roundStartedRef.current = false
     transitionPendingRef.current = false
   }
 
@@ -114,8 +137,8 @@ export default function GameScreen() {
           hintRegion={hints.hintRegion}
           boardRevision={match.boardRevision}
           gameStatus={match.status}
-          onPlaceRegion={playMove.placeRegion}
-          onRemoveRegion={playMove.removeRegion}
+          onPlaceRegion={handlePlaceRegion}
+          onRemoveRegion={handleRemoveRegion}
         />
       </div>
 
