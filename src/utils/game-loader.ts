@@ -6,12 +6,11 @@ let criticalPreloadPromise: Promise<void> | null = null;
 async function preloadFonts(): Promise<void> {
   if (typeof document === 'undefined' || !('fonts' in document)) return;
   try {
+    // ponytail: preload only fonts actually declared in index.html to avoid stalls
     await Promise.all([
-      document.fonts.load('400 16px "Be Vietnam Pro"'),
-      document.fonts.load('700 16px "Be Vietnam Pro"'),
-      document.fonts.load('800 16px "Be Vietnam Pro"'),
       document.fonts.load('500 16px "Plus Jakarta Sans"'),
       document.fonts.load('700 16px "Plus Jakarta Sans"'),
+      document.fonts.load('700 16px "Space Grotesk"'),
     ]);
     await document.fonts.ready;
   } catch {

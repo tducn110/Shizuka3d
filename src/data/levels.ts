@@ -108,10 +108,82 @@ const UNIQUE_SEEDS = [
   863724623, 3613604107, 1934895094, 275274824,
 ]
 
+const TUTORIAL_LEVELS: Level[] = [
+  {
+    id: 1,
+    rows: 3,
+    cols: 3,
+    clues: [
+      { row: 0, col: 0, value: 3 },
+      { row: 1, col: 0, value: 2 },
+      { row: 1, col: 1, value: 4 },
+    ],
+    solution: [
+      { row: 0, col: 0, width: 3, height: 1 },
+      { row: 1, col: 0, width: 1, height: 2 },
+      { row: 1, col: 1, width: 2, height: 2 },
+    ],
+  },
+  {
+    id: 2,
+    rows: 4,
+    cols: 4,
+    clues: [
+      { row: 0, col: 1, value: 4 },
+      { row: 2, col: 0, value: 3 },
+      { row: 2, col: 2, value: 9 },
+    ],
+    solution: [
+      { row: 0, col: 0, width: 4, height: 1 },
+      { row: 1, col: 0, width: 1, height: 3 },
+      { row: 1, col: 1, width: 3, height: 3 },
+    ],
+  },
+  {
+    id: 3,
+    rows: 4,
+    cols: 4,
+    clues: [
+      { row: 0, col: 0, value: 4 },
+      { row: 0, col: 3, value: 4 },
+      { row: 3, col: 0, value: 4 },
+      { row: 2, col: 2, value: 4 },
+    ],
+    solution: [
+      { row: 0, col: 0, width: 2, height: 2 },
+      { row: 0, col: 2, width: 2, height: 2 },
+      { row: 2, col: 0, width: 2, height: 2 },
+      { row: 2, col: 2, width: 2, height: 2 },
+    ],
+  },
+  {
+    id: 4,
+    rows: 4,
+    cols: 4,
+    clues: [
+      { row: 0, col: 0, value: 2 },
+      { row: 0, col: 2, value: 3 },
+      { row: 1, col: 3, value: 3 },
+      { row: 2, col: 0, value: 4 },
+      { row: 3, col: 3, value: 4 },
+    ],
+    solution: [
+      { row: 0, col: 0, width: 1, height: 2 },
+      { row: 0, col: 1, width: 3, height: 1 },
+      { row: 1, col: 1, width: 3, height: 1 },
+      { row: 2, col: 0, width: 2, height: 2 },
+      { row: 2, col: 2, width: 2, height: 2 },
+    ],
+  },
+]
+
 function makeLevel(id: number): Level {
-  const i = id - 1
+  if (id <= TUTORIAL_LEVELS.length) {
+    return TUTORIAL_LEVELS[id - 1]
+  }
+  const i = id - TUTORIAL_LEVELS.length - 1
   const { rows, cols, maxArea, stopProb } = specFor(i)
-  const seed = UNIQUE_SEEDS[i]
+  const seed = UNIQUE_SEEDS[i % UNIQUE_SEEDS.length]
   const rng = makeLcg(seed)
   const solution = partition(rows, cols, maxArea, stopProb, rng)
   const clues = placeClues(solution, rng)

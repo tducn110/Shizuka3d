@@ -6,6 +6,8 @@ import {
 } from "../behaviors/board-navigation/useCameraRotation"
 
 import Button from "../ui/components/Button"
+import { Trophy } from "lucide-react"
+import LeaderboardModal from "../ui/overlays/LeaderboardModal"
 
 // ── Grid units and scale ───────────────────────────────────────────────────
 const S = 48 // pixels per grid unit
@@ -48,6 +50,7 @@ interface Props {
 }
 
 export default function IntroScreen({ onPlay }: Props) {
+  const [showLeaderboard, setShowLeaderboard] = useState(false)
   // Keep the intro's ambient camera sway without exposing a control panel.
   const { angle } = useCameraRotation({
     autoSway: true,
@@ -302,12 +305,34 @@ export default function IntroScreen({ onPlay }: Props) {
         >
           Shikaku 3D
         </h1>
-        {onPlay && (
-          <Button variant="hero" onClick={onPlay} style={{ marginTop: 8 }}>
-            Play Game →
-          </Button>
-        )}
+        <div style={{ display: "flex", gap: 12, alignItems: "center", marginTop: 8, pointerEvents: "all" }}>
+          {onPlay && (
+            <Button variant="hero" onClick={onPlay}>
+              Play Game →
+            </Button>
+          )}
+          <button
+            type="button"
+            onClick={() => setShowLeaderboard(true)}
+            aria-label="Leaderboard"
+            style={{
+              width: 52,
+              height: 52,
+              borderRadius: 16,
+              border: "1.5px solid rgba(0,0,0,0.12)",
+              background: "#fffdf8",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              boxShadow: "0 8px 24px rgba(0,0,0,0.08)",
+            }}
+          >
+            <Trophy size={22} color="#e27c26" />
+          </button>
+        </div>
       </div>
+      {showLeaderboard && <LeaderboardModal onClose={() => setShowLeaderboard(false)} />}
     </div>
   )
 }

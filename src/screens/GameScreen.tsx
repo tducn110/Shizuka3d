@@ -1,4 +1,5 @@
 import { useRef, useState, useEffect, useCallback } from "react"
+import { useTranslation } from "react-i18next"
 import { LEVELS } from "../data/levels"
 import { useMatchController } from "../behaviors/match/MatchController"
 import { usePlayMoveController } from "../behaviors/play-move/PlayMoveController"
@@ -7,11 +8,40 @@ import GameHUD from "../ui/gameplay/GameHUD"
 import IsometricBoard from "../behaviors/board-rendering/IsometricBoard"
 import PauseModal from "../ui/overlays/PauseModal"
 import CompleteModal from "../ui/overlays/CompleteModal"
+import LeaderboardModal from "../ui/overlays/LeaderboardModal"
+import HowToPlayModal from "../ui/overlays/HowToPlayModal"
 import { showInterstitial } from "../integrations/ads/googleH5Ads"
 import { useWinkIntegration } from "../integrations/wink/useWinkIntegration"
+import { AlertCircle, CheckCircle } from "lucide-react"
+
+const TUTORIAL_STEPS = [
+  {
+    clue: { row: 0, col: 0 },
+    target: { row: 0, col: 0, width: 3, height: 1 },
+    instructionKey: "tutorial.step1",
+    successKey: "tutorial.step1Success",
+  },
+  {
+    clue: { row: 1, col: 0 },
+    target: { row: 1, col: 0, width: 1, height: 2 },
+    instructionKey: "tutorial.step2",
+    successKey: "tutorial.step2Success",
+  },
+  {
+    clue: { row: 1, col: 1 },
+    target: { row: 1, col: 1, width: 2, height: 2 },
+    instructionKey: "tutorial.step3",
+    successKey: "tutorial.complete",
+  },
+]
 
 export default function GameScreen() {
+  const { t } = useTranslation()
   const [levelIndex, setLevelIndex] = useState(0)
+  const [showLeaderboard, setShowLeaderboard] = useState(false)
+  const [showHowToPlay, setShowHowToPlay] = useState(false)
+  const [feedback, setFeedback] = useState<{ message: string; type: "error" | "success" } | null>(null)
+  const feedbackTimerRef = useRef<NodeJS.Timeout | null>(null)
   const transitionPendingRef = useRef(false)
   const wink = useWinkIntegration()
   
@@ -26,19 +56,55 @@ export default function GameScreen() {
   // 3. Hint System Behavior
   const hints = useHintController(match.level, playMove.regions)
 
+  const isTutorial = match.level.id <= 2
+  const tutorialStepIndex = match.level.id === 1 ? Math.min(2, playMove.regions.length) : -1
+  const tutorialStep = match.level.id === 1 ? TUTORIAL_STEPS[tutorialStepIndex] : null
+  const tutorialTarget = match.level.id === 1 ? tutorialStep?.target : null
+  const highlightClue = match.level.id === 1 ? tutorialStep?.clue : null
+
   const handlePlaceRegion = useCallback((region: any) => {
     if (!roundStartedRef.current) {
       wink.gameplayStart()
       roundStartedRef.current = true
     }
-    return playMove.placeRegion(region)
-  }, [wink, playMove])
+    const result = playMove.placeRegion(region)
+    if (!result.success) {
+      let msg = ""
+      if (result.reason === "wrong area") {
+        msg = t("feedback.wrongArea", { count: result.area, clue: result.clueValue })
+      } else if (result.reason === "multiple clues") {
+        msg = t("feedback.multipleClues")
+      } else if (result.reason === "no clue") {
+        msg = t("feedback.noClue")
+      } else if (result.reason === "overlap") {
+        msg = t("feedback.overlap")
+      } else {
+        msg = t("feedback.outOfBounds")
+      }
+      setFeedback({ message: msg, type: "error" })
+      if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current)
+      feedbackTimerRef.current = setTimeout(() => setFeedback(null), 3200)
+    } else {
+      if (match.level.id === 1) {
+        const step = TUTORIAL_STEPS[playMove.regions.length]
+        if (step) {
+          setFeedback({ message: t(step.successKey), type: "success" })
+          if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current)
+          feedbackTimerRef.current = setTimeout(() => setFeedback(null), 2500)
+        }
+      } else {
+        setFeedback(null)
+      }
+    }
+    return result
+  }, [wink, playMove, match.level.id, t])
 
   const handleRemoveRegion = useCallback((id: string) => {
     if (!roundStartedRef.current) {
       wink.gameplayStart()
       roundStartedRef.current = true
     }
+    setFeedback(null)
     playMove.removeRegion(id)
   }, [wink, playMove])
 
@@ -48,6 +114,9 @@ export default function GameScreen() {
       if (roundStartedRef.current) {
         wink.gameplayStop()
         roundStartedRef.current = false
+      }
+      if (feedbackTimerRef.current) {
+        clearTimeout(feedbackTimerRef.current)
       }
     }
   }, [wink])
@@ -77,7 +146,23 @@ export default function GameScreen() {
   useEffect(() => {
     playMove.clear()
     hints.clear()
+    setFeedback(null)
   }, [match.boardRevision])
+
+  const skipTutorial = useCallback(() => {
+    const next = 2 // Jump to Level 3 (id: 3)
+    setLevelIndex(next)
+    match.loadLevel(LEVELS[next])
+    setFeedback(null)
+    roundStartedRef.current = false
+  }, [match])
+
+  const replayTutorial = useCallback(() => {
+    setLevelIndex(0) // Jump to Level 1
+    match.loadLevel(LEVELS[0])
+    setFeedback(null)
+    roundStartedRef.current = false
+  }, [match])
 
   const goNext = async () => {
     if (transitionPendingRef.current) return
@@ -118,39 +203,140 @@ export default function GameScreen() {
         paddingRight: "env(safe-area-inset-right)",
       }}
     >
-      <GameHUD levelId={match.level.id} onPause={match.pause} />
+      <GameHUD
+        levelId={match.level.id}
+        onPause={match.pause}
+        onLeaderboard={() => setShowLeaderboard(true)}
+        onHowToPlay={() => setShowHowToPlay(true)}
+        onSkipTutorial={isTutorial ? skipTutorial : undefined}
+        isTutorial={isTutorial}
+        completedCount={playMove.regions.length}
+        totalCount={match.level.clues.length}
+      />
+
+      {/* Tutorial Guidance / Feedback Banner */}
+      <div
+        style={{
+          padding: "6px 16px 2px",
+          display: "flex",
+          justifyContent: "center",
+          minHeight: 38,
+          pointerEvents: "none",
+        }}
+      >
+        {feedback ? (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "6px 14px",
+              borderRadius: 12,
+              background: feedback.type === "error" ? "#fef2f2" : "#f0fdf4",
+              border: `1px solid ${feedback.type === "error" ? "#fecaca" : "#bbf7d0"}`,
+              color: feedback.type === "error" ? "#991b1b" : "#166534",
+              fontSize: 13,
+              fontWeight: 600,
+              boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
+              textAlign: "center",
+            }}
+          >
+            {feedback.type === "error" ? (
+              <AlertCircle size={16} color="#dc2626" />
+            ) : (
+              <CheckCircle size={16} color="#16a34a" />
+            )}
+            <span>{feedback.message}</span>
+          </div>
+        ) : match.level.id === 1 && tutorialStep ? (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "6px 14px",
+              borderRadius: 12,
+              background: "#eff6ff",
+              border: "1px solid #bfdbfe",
+              color: "#1e40af",
+              fontSize: 13,
+              fontWeight: 600,
+              boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
+              textAlign: "center",
+            }}
+          >
+            <span
+              style={{
+                background: "#2563eb",
+                color: "#fff",
+                borderRadius: 8,
+                padding: "1px 6px",
+                fontSize: 11,
+                fontWeight: 700,
+              }}
+            >
+              {tutorialStepIndex + 1}/3
+            </span>
+            <span>{t(tutorialStep.instructionKey)}</span>
+          </div>
+        ) : match.level.id === 2 ? (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "6px 14px",
+              borderRadius: 12,
+              background: "#fdfbf7",
+              border: "1px solid rgba(0,0,0,0.08)",
+              color: "#6b5744",
+              fontSize: 12.5,
+              fontWeight: 600,
+              textAlign: "center",
+            }}
+          >
+            <span>💡 {t("tutorial.level2Tip")}</span>
+          </div>
+        ) : null}
+      </div>
 
       {/* Board area */}
       <div
         style={{
           flex: 1,
+          width: "100%",
           display: "flex",
-          alignItems: "center",
+          alignItems: "stretch",
           justifyContent: "center",
-          padding: "12px 20px",
+          padding: "4px 12px 8px",
           minHeight: 0,
+          position: "relative",
         }}
       >
-        <IsometricBoard
-          level={match.level}
-          regions={playMove.regions}
-          hintRegion={hints.hintRegion}
-          boardRevision={match.boardRevision}
-          gameStatus={match.status}
-          onPlaceRegion={handlePlaceRegion}
-          onRemoveRegion={handleRemoveRegion}
-        />
+        <div style={{ width: "100%", height: "100%", minHeight: 0, position: "relative" }}>
+          <IsometricBoard
+            level={match.level}
+            regions={playMove.regions}
+            hintRegion={hints.hintRegion}
+            boardRevision={match.boardRevision}
+            gameStatus={match.status}
+            onPlaceRegion={handlePlaceRegion}
+            onRemoveRegion={handleRemoveRegion}
+            tutorialTarget={tutorialTarget}
+            highlightClue={highlightClue}
+          />
+        </div>
       </div>
 
-      {/* Bottom controls */}
+      {/* Controls: Hint + Undo */}
       <div
         style={{
-          flexShrink: 0,
-          padding: "12px 24px 20px",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           gap: 12,
+          padding: "12px 20px 20px",
+          flexShrink: 0,
         }}
       >
         <HintButton
@@ -165,13 +351,26 @@ export default function GameScreen() {
       </div>
 
       {match.status === "paused" && (
-        <PauseModal onResume={match.resume} onRestart={match.restart} />
+        <PauseModal
+          onResume={match.resume}
+          onRestart={match.restart}
+          onHowToPlay={() => setShowHowToPlay(true)}
+        />
       )}
       {match.status === "completed" && (
         <CompleteModal
           levelId={match.level.id}
           onReplay={goReplay}
           onNext={goNext}
+        />
+      )}
+      {showLeaderboard && (
+        <LeaderboardModal onClose={() => setShowLeaderboard(false)} />
+      )}
+      {showHowToPlay && (
+        <HowToPlayModal
+          onClose={() => setShowHowToPlay(false)}
+          onReplayTutorial={replayTutorial}
         />
       )}
     </div>
@@ -195,19 +394,17 @@ function HintButton({
         display: "flex",
         alignItems: "center",
         gap: 8,
-        padding: "10px 20px",
+        padding: "10px 22px",
         borderRadius: 14,
-        border: "1.5px solid rgba(0,0,0,0.1)",
-        background: disabled
-          ? "rgba(255,255,255,0.4)"
-          : "rgba(255,255,255,0.85)",
-        color: disabled ? "#c0ad9a" : "#6b5744",
+        border: "none",
+        background: disabled ? "rgba(46, 32, 22, 0.2)" : "#2e2016",
+        color: disabled ? "#a39281" : "#fffdf8",
         fontSize: 14,
-        fontWeight: 600,
+        fontWeight: 700,
         fontFamily: "'Outfit', sans-serif",
         cursor: disabled ? "not-allowed" : "pointer",
-        transition: "background 0.15s, opacity 0.15s",
-        boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
+        transition: "transform 0.15s, box-shadow 0.15s, opacity 0.15s",
+        boxShadow: disabled ? "none" : "0 4px 14px rgba(46, 32, 22, 0.22)",
       }}
     >
       <svg
@@ -215,19 +412,19 @@ function HintButton({
         height="16"
         viewBox="0 0 16 16"
         fill="currentColor"
-        style={{ opacity: disabled ? 0.4 : 1 }}
+        style={{ color: disabled ? "#a39281" : "#f59e0b" }}
       >
         <path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1Zm-.75 9.5V7.5h1.5v3h-1.5Zm.75-4.25a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5Z" />
       </svg>
       Hint
       <span
         style={{
-          background: disabled ? "#e8ddd2" : "#2e2016",
-          color: disabled ? "#b0a090" : "#fffdf8",
+          background: disabled ? "rgba(255,255,255,0.2)" : "#f59e0b",
+          color: disabled ? "#a39281" : "#1a110a",
           borderRadius: 8,
-          padding: "1px 7px",
+          padding: "2px 8px",
           fontSize: 12,
-          fontWeight: 700,
+          fontWeight: 800,
           fontFamily: "'JetBrains Mono', monospace",
         }}
       >
@@ -253,16 +450,14 @@ function UndoButton({
         width: 44,
         height: 44,
         borderRadius: 14,
-        border: "1.5px solid rgba(0,0,0,0.1)",
-        background: disabled
-          ? "rgba(255,255,255,0.4)"
-          : "rgba(255,255,255,0.85)",
-        color: disabled ? "#c0ad9a" : "#6b5744",
+        border: "1.5px solid rgba(0,0,0,0.12)",
+        background: disabled ? "rgba(255,255,255,0.4)" : "#fffdf8",
+        color: disabled ? "#c0ad9a" : "#2e2016",
         cursor: disabled ? "not-allowed" : "pointer",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        boxShadow: "0 1px 4px rgba(0,0,0,0.06)",
+        boxShadow: disabled ? "none" : "0 2px 8px rgba(0,0,0,0.06)",
         transition: "background 0.15s",
       }}
     >
@@ -272,7 +467,7 @@ function UndoButton({
         viewBox="0 0 18 18"
         fill="none"
         stroke="currentColor"
-        strokeWidth="2"
+        strokeWidth="2.2"
         strokeLinecap="round"
         strokeLinejoin="round"
       >

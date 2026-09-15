@@ -1,26 +1,28 @@
 import { useState, useCallback, useRef } from "react"
 import type { Level, Region, Selection } from "../../core/types"
 import { normalizeSelection } from "../../core/geometry"
-import { validateRectangle } from "./moveValidation"
+import { validateRectangle, type ValidationReason } from "./moveValidation"
 import { isBoardComplete } from "../match/completion"
 
-const PASTEL_COLORS = [
-  "#ffd6d6",
-  "#d0e8ff",
-  "#c8f5d8",
-  "#fff3c8",
-  "#e4d0ff",
-  "#ffd0ec",
-  "#c8f5ee",
-  "#ffe4cc",
-  "#cce8ff",
-  "#ecffc8",
-  "#fce0cc",
-  "#ccf5e4",
-  "#f5ccf0",
-  "#e0f5cc",
-  "#ccd4f5",
+export const HARMONIC_REGION_COLORS = [
+  "#7ba194", // sage green
+  "#d4a373", // warm amber
+  "#b58296", // dusty mauve
+  "#7293b5", // slate blue
+  "#c98169", // terracotta
+  "#8ca672", // muted olive
+  "#9883b5", // iris lavender
+  "#6da39c", // calm teal
+  "#c79275", // soft clay
+  "#859bb3", // dusty sky
 ]
+
+export interface PlaceMoveResult {
+  success: boolean
+  reason?: ValidationReason
+  clueValue?: number
+  area?: number
+}
 
 export function usePlayMoveController(level: Level, onComplete: () => void) {
   const [regions, setRegions] = useState<Region[]>([])
@@ -35,7 +37,7 @@ export function usePlayMoveController(level: Level, onComplete: () => void) {
   }, [])
 
   const placeRegion = useCallback(
-    (sel: Selection): boolean => {
+    (sel: Selection): PlaceMoveResult => {
       const result = validateRectangle(
         sel,
         level.clues,
@@ -43,11 +45,19 @@ export function usePlayMoveController(level: Level, onComplete: () => void) {
         level.rows,
         level.cols,
       )
-      if (!result.valid || !result.clue) return false
+
+      if (!result.valid || !result.clue) {
+        return {
+          success: false,
+          reason: result.reason,
+          clueValue: result.clueValue,
+          area: result.area,
+        }
+      }
 
       const { r0, c0, r1, c1 } = normalizeSelection(sel)
       const id = `region-${++regionCounterRef.current}`
-      const color = PASTEL_COLORS[colorIndex % PASTEL_COLORS.length]
+      const color = HARMONIC_REGION_COLORS[colorIndex % HARMONIC_REGION_COLORS.length]
 
       const newRegion: Region = {
         id,
@@ -69,7 +79,11 @@ export function usePlayMoveController(level: Level, onComplete: () => void) {
       if (isBoardComplete(level, newRegions)) {
         onComplete()
       }
-      return true
+      return {
+        success: true,
+        clueValue: result.clue.value,
+        area: result.area,
+      }
     },
     [level, regions, colorIndex, onComplete],
   )

@@ -4,7 +4,12 @@ export function getHintRegion(
   level: Level,
   regions: Region[],
 ): RegionDef | null {
-  const solvedKeys = new Set(regions.map((r) => `${r.clueRow},${r.clueCol}`))
+  // ponytail: only consider a clue solved if region width*height matches clue value
+  const solvedKeys = new Set(
+    regions
+      .filter((r) => r.width * r.height === r.clueValue)
+      .map((r) => `${r.clueRow},${r.clueCol}`),
+  )
 
   for (const clue of level.clues) {
     if (solvedKeys.has(`${clue.row},${clue.col}`)) continue

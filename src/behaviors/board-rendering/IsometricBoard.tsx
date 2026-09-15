@@ -7,8 +7,10 @@ interface Props {
   hintRegion: RegionDef | null
   boardRevision: number
   gameStatus: GameStatus
-  onPlaceRegion: (selection: Selection) => boolean
+  onPlaceRegion: (selection: Selection) => any
   onRemoveRegion: (id: string) => void
+  tutorialTarget?: RegionDef | null
+  highlightClue?: { row: number; col: number } | null
 }
 
 // Compatibility boundary: game state and its prop contract remain unchanged;

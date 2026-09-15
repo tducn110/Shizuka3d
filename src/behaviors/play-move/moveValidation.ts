@@ -1,10 +1,19 @@
 import type { Clue, Region, Selection } from "../../core/types"
 import { normalizeSelection } from "../../core/geometry"
 
+export type ValidationReason =
+  | "out of bounds"
+  | "overlap"
+  | "no clue"
+  | "multiple clues"
+  | "wrong area"
+
 export interface ValidationResult {
   valid: boolean
-  reason?: string
+  reason?: ValidationReason
   clue?: Clue
+  clueValue?: number
+  area?: number
 }
 
 export function getCluesInsideRectangle(
@@ -50,17 +59,18 @@ export function validateRectangle(
   const { r0, c0, r1, c1, area } = normalizeSelection(sel)
 
   if (r0 < 0 || c0 < 0 || r1 >= rows || c1 >= cols)
-    return { valid: false, reason: "out of bounds" }
+    return { valid: false, reason: "out of bounds", area }
 
   if (hasRegionOverlap(r0, c0, r1, c1, regions))
-    return { valid: false, reason: "overlap" }
+    return { valid: false, reason: "overlap", area }
 
   const inside = getCluesInsideRectangle(r0, c0, r1, c1, clues)
-  if (inside.length === 0) return { valid: false, reason: "no clue" }
-  if (inside.length > 1) return { valid: false, reason: "multiple clues" }
+  if (inside.length === 0) return { valid: false, reason: "no clue", area }
+  if (inside.length > 1) return { valid: false, reason: "multiple clues", area }
 
   const clue = inside[0]
-  if (area !== clue.value) return { valid: false, reason: "wrong area" }
+  if (area !== clue.value)
+    return { valid: false, reason: "wrong area", clue, clueValue: clue.value, area }
 
-  return { valid: true, clue }
+  return { valid: true, clue, clueValue: clue.value, area }
 }

@@ -189,4 +189,30 @@ assert(
   "OOB region",
 )
 
+// Validation reason details check
+const wrongAreaResult = validateRectangle(
+  { startRow: 0, startCol: 0, endRow: 0, endCol: 1 },
+  level.clues,
+  [],
+  3,
+  3,
+)
+assert(wrongAreaResult.reason === "wrong area", "Wrong area reason")
+assert(wrongAreaResult.area === 2, "Wrong area reports area 2")
+assert(wrongAreaResult.clueValue === 3, "Wrong area reports clue 3")
+
+import { LEVELS } from "../src/data/levels"
+assert(LEVELS[0].id === 1 && LEVELS[0].rows === 3 && LEVELS[0].cols === 3, "Level 1 is 3x3 tutorial")
+assert(LEVELS[1].id === 2 && LEVELS[1].rows === 4 && LEVELS[1].cols === 4, "Level 2 is 4x4 tutorial")
+
+const l1Regions = LEVELS[0].solution.map((rect, idx) => ({
+  id: `l1-${idx}`,
+  ...rect,
+  clueRow: LEVELS[0].clues[idx].row,
+  clueCol: LEVELS[0].clues[idx].col,
+  clueValue: LEVELS[0].clues[idx].value,
+  color: "",
+}))
+assert(isBoardComplete(LEVELS[0], l1Regions) === true, "Level 1 solved cleanly")
+
 console.log("ALL PURE GAME RULE TESTS PASSED")

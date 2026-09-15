@@ -4,9 +4,10 @@ import { useTranslation } from "react-i18next"
 interface Props {
   onResume: () => void
   onRestart: () => void
+  onHowToPlay?: () => void
 }
 
-export default function PauseModal({ onResume, onRestart }: Props) {
+export default function PauseModal({ onResume, onRestart, onHowToPlay }: Props) {
   const { t, i18n } = useTranslation()
   const currentLanguage = i18n.resolvedLanguage?.startsWith("en") ? "en" : "vi"
   const nextLanguage = currentLanguage === "vi" ? "en" : "vi"
@@ -30,13 +31,13 @@ export default function PauseModal({ onResume, onRestart }: Props) {
         style={{
           background: "#fffdf8",
           borderRadius: 20,
-          padding: "36px 40px",
-          width: 280,
+          padding: "32px 36px",
+          width: 290,
           boxShadow: "0 20px 60px rgba(0,0,0,0.18)",
           border: "1.5px solid rgba(0,0,0,0.08)",
           display: "flex",
           flexDirection: "column",
-          gap: 14,
+          gap: 12,
           alignItems: "stretch",
         }}
       >
@@ -56,6 +57,11 @@ export default function PauseModal({ onResume, onRestart }: Props) {
         <Button variant="secondary" onClick={() => void i18n.changeLanguage(nextLanguage)}>
           {t("settings.language")}: {nextLanguage.toUpperCase()}
         </Button>
+        {onHowToPlay && (
+          <Button variant="secondary" onClick={onHowToPlay}>
+            {t("game.howToPlay")}
+          </Button>
+        )}
         <Button variant="primary" onClick={onResume}>{t("common.resume")}</Button>
         <Button variant="secondary" onClick={onRestart}>{t("common.retry")}</Button>
       </div>
