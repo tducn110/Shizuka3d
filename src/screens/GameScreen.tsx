@@ -40,7 +40,7 @@ export default function GameScreen() {
   const [levelIndex, setLevelIndex] = useState(0)
   const [showLeaderboard, setShowLeaderboard] = useState(false)
   const [showHowToPlay, setShowHowToPlay] = useState(false)
-  const [feedback, setFeedback] = useState<{ message: string; type: "error" | "success" } | null>(null)
+  const [feedback, setFeedback] = useState<{ message: string; type: "error" | "success" | "warning" } | null>(null)
   const feedbackTimerRef = useRef<NodeJS.Timeout | null>(null)
   const transitionPendingRef = useRef(false)
   const wink = useWinkIntegration()
@@ -240,9 +240,25 @@ export default function GameScreen() {
               gap: 8,
               padding: "6px 14px",
               borderRadius: 12,
-              background: feedback.type === "error" ? "#fef2f2" : "#f0fdf4",
-              border: `1px solid ${feedback.type === "error" ? "#fecaca" : "#bbf7d0"}`,
-              color: feedback.type === "error" ? "#991b1b" : "#166534",
+              background:
+                feedback.type === "error"
+                  ? "#fef2f2"
+                  : feedback.type === "warning"
+                    ? "#fffbeb"
+                    : "#f0fdf4",
+              border: `1px solid ${
+                feedback.type === "error"
+                  ? "#fecaca"
+                  : feedback.type === "warning"
+                    ? "#fde68a"
+                    : "#bbf7d0"
+              }`,
+              color:
+                feedback.type === "error"
+                  ? "#991b1b"
+                  : feedback.type === "warning"
+                    ? "#92400e"
+                    : "#166534",
               fontSize: 13,
               fontWeight: 600,
               boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
@@ -251,6 +267,8 @@ export default function GameScreen() {
           >
             {feedback.type === "error" ? (
               <AlertCircle size={16} color="#dc2626" />
+            ) : feedback.type === "warning" ? (
+              <AlertCircle size={16} color="#d97706" />
             ) : (
               <CheckCircle size={16} color="#16a34a" />
             )}

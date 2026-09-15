@@ -1,6 +1,6 @@
 import { Canvas, useThree } from "@react-three/fiber"
 import { OrbitControls, Text } from "@react-three/drei"
-import { Suspense, useCallback, useLayoutEffect, useMemo, useRef, useState } from "react"
+import { Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react"
 import * as THREE from "three"
 import type { GameStatus, Level, Region, RegionDef, Selection } from "../../core/types"
 import { normalizeSelection } from "../../core/geometry"
@@ -109,7 +109,7 @@ function CameraRig({
       if (rect.width <= 0 || rect.height <= 0) return false
       const ndcX = ((clientX - rect.left) / rect.width) * 2 - 1
       const ndcY = -(((clientY - rect.top) / rect.height) * 2 - 1)
-      raycaster.setFromCamera({ x: ndcX, y: ndcY }, camera)
+      raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), camera)
       const ray = raycaster.ray
       if (Math.abs(ray.direction.y) > 1e-5) {
         const t = -ray.origin.y / ray.direction.y
@@ -446,8 +446,12 @@ function capturePointer(
     setPointerCapture?: (pointerId: number) => void
     releasePointerCapture?: (pointerId: number) => void
   }) | null
-  if (release) target?.releasePointerCapture?.(event.pointerId)
-  else target?.setPointerCapture?.(event.pointerId)
+  try {
+    if (release) target?.releasePointerCapture?.(event.pointerId)
+    else target?.setPointerCapture?.(event.pointerId)
+  } catch {
+    // Safely ignore if pointerId is not captured on this element
+  }
 }
 
 function SelectionPreview({
