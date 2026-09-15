@@ -49,6 +49,7 @@ const resources = {
         noClue: "Hình chữ nhật phải chứa một số gợi ý.",
         overlap: "Vùng này bị đè lên một hình đã có.",
         outOfBounds: "Vùng chọn vượt ra ngoài bàn cờ.",
+        boardFullIncorrect: "Bảng đã phủ kín nhưng các khối chưa đúng nghiệm. Hãy chạm vào khối để gỡ hoặc vẽ lại nhé!",
       },
       rulesModal: {
         title: "Luật chơi Shikaku",
@@ -105,6 +106,7 @@ const resources = {
         noClue: "A rectangle must contain one number.",
         overlap: "This area overlaps another rectangle.",
         outOfBounds: "Selection is out of bounds.",
+        boardFullIncorrect: "The board is full, but the rectangles do not match the clues yet. Tap a block to remove or redraw!",
       },
       rulesModal: {
         title: "How to Play Shikaku",

@@ -26,7 +26,7 @@ export interface PlaceMoveResult {
 
 export function usePlayMoveController(level: Level, onComplete: () => void) {
   const [regions, setRegions] = useState<Region[]>([])
-  const [history, setHistory] = useState<string[]>([])
+  const [history, setHistory] = useState<Region[][]>([])
   const [colorIndex, setColorIndex] = useState(0)
   const regionCounterRef = useRef(0)
 
@@ -38,24 +38,39 @@ export function usePlayMoveController(level: Level, onComplete: () => void) {
 
   const placeRegion = useCallback(
     (sel: Selection): PlaceMoveResult => {
-      const result = validateRectangle(
-        sel,
-        level.clues,
-        regions,
-        level.rows,
-        level.cols,
-      )
+      const { r0, c0, r1, c1, area } = normalizeSelection(sel)
 
-      if (!result.valid || !result.clue) {
+      // Bounds validation
+      if (r0 < 0 || c0 < 0 || r1 >= level.rows || c1 >= level.cols) {
         return {
           success: false,
-          reason: result.reason,
-          clueValue: result.clueValue,
-          area: result.area,
+          reason: "out of bounds",
+          area,
         }
       }
 
-      const { r0, c0, r1, c1 } = normalizeSelection(sel)
+      // Check clues inside this rectangle
+      const cluesInside = level.clues.filter(
+        (clue) => clue.row >= r0 && clue.row <= r1 && clue.col >= c0 && clue.col <= c1,
+      )
+      const clue = cluesInside.length === 1 ? cluesInside[0] : undefined
+
+      // Overlap resolution: remove any existing regions that intersect with the new rectangle
+      const nextRegions: Region[] = []
+      for (const reg of regions) {
+        const overlaps =
+          r0 < reg.row + reg.height &&
+          r1 >= reg.row &&
+          c0 < reg.col + reg.width &&
+          c1 >= reg.col
+        if (!overlaps) {
+          nextRegions.push(reg)
+        }
+      }
+
+      // Save previous board state for reliable undo
+      setHistory((prev) => [...prev, regions])
+
       const id = `region-${++regionCounterRef.current}`
       const color = HARMONIC_REGION_COLORS[colorIndex % HARMONIC_REGION_COLORS.length]
 
@@ -65,42 +80,41 @@ export function usePlayMoveController(level: Level, onComplete: () => void) {
         col: c0,
         width: c1 - c0 + 1,
         height: r1 - r0 + 1,
-        clueRow: result.clue.row,
-        clueCol: result.clue.col,
-        clueValue: result.clue.value,
+        clueRow: clue ? clue.row : -1,
+        clueCol: clue ? clue.col : -1,
+        clueValue: clue ? clue.value : area,
         color,
       }
 
-      const newRegions = [...regions, newRegion]
-      setRegions(newRegions)
-      setHistory((h) => [...h, id])
+      const updatedRegions = [...nextRegions, newRegion]
+      setRegions(updatedRegions)
       setColorIndex((i) => i + 1)
 
-      if (isBoardComplete(level, newRegions)) {
+      // Win condition: Scope 1 (fill 100% board) & Scope 2 (1 valid solution matching clues)
+      if (isBoardComplete(level, updatedRegions)) {
         onComplete()
       }
+
       return {
         success: true,
-        clueValue: result.clue.value,
-        area: result.area,
+        clueValue: clue?.value ?? area,
+        area,
       }
     },
     [level, regions, colorIndex, onComplete],
   )
 
   const removeRegion = useCallback((id: string) => {
+    setHistory((prev) => [...prev, regions])
     setRegions((r) => r.filter((reg) => reg.id !== id))
-    setHistory((h) => h.filter((hid) => hid !== id))
-  }, [])
+  }, [regions])
 
   const undo = useCallback(() => {
-    setHistory((h) => {
-      if (h.length === 0) return h
-      return h.slice(0, -1)
-    })
-    setRegions((r) => {
-      if (r.length === 0) return r
-      return r.slice(0, -1)
+    setHistory((prev) => {
+      if (prev.length === 0) return prev
+      const previousState = prev[prev.length - 1]
+      setRegions(previousState)
+      return prev.slice(0, -1)
     })
   }, [])
 

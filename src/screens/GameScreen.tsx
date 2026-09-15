@@ -69,21 +69,11 @@ export default function GameScreen() {
     }
     const result = playMove.placeRegion(region)
     if (!result.success) {
-      let msg = ""
-      if (result.reason === "wrong area") {
-        msg = t("feedback.wrongArea", { count: result.area, clue: result.clueValue })
-      } else if (result.reason === "multiple clues") {
-        msg = t("feedback.multipleClues")
-      } else if (result.reason === "no clue") {
-        msg = t("feedback.noClue")
-      } else if (result.reason === "overlap") {
-        msg = t("feedback.overlap")
-      } else {
-        msg = t("feedback.outOfBounds")
+      if (result.reason === "out of bounds") {
+        setFeedback({ message: t("feedback.outOfBounds"), type: "error" })
+        if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current)
+        feedbackTimerRef.current = setTimeout(() => setFeedback(null), 2500)
       }
-      setFeedback({ message: msg, type: "error" })
-      if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current)
-      feedbackTimerRef.current = setTimeout(() => setFeedback(null), 3200)
     } else {
       if (match.level.id === 1) {
         const step = TUTORIAL_STEPS[playMove.regions.length]
@@ -93,11 +83,29 @@ export default function GameScreen() {
           feedbackTimerRef.current = setTimeout(() => setFeedback(null), 2500)
         }
       } else {
-        setFeedback(null)
+        setFeedback((prev) => (prev?.type === "error" ? null : prev))
       }
     }
     return result
   }, [wink, playMove, match.level.id, t])
+
+  // Check if board is 100% covered but not yet solved
+  const totalCells = match.level.rows * match.level.cols
+  useEffect(() => {
+    if (match.status !== "playing") return
+    let covered = 0
+    for (const reg of playMove.regions) {
+      covered += reg.width * reg.height
+    }
+    if (covered >= totalCells) {
+      setFeedback({
+        message: t("feedback.boardFullIncorrect"),
+        type: "warning",
+      })
+    } else {
+      setFeedback((prev) => (prev?.type === "warning" ? null : prev))
+    }
+  }, [playMove.regions, match.status, totalCells, t])
 
   const handleRemoveRegion = useCallback((id: string) => {
     if (!roundStartedRef.current) {

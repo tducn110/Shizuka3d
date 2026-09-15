@@ -37,9 +37,18 @@ function boxHeight(value: number) {
   return Math.max(0.7, value * HEIGHT_SCALE)
 }
 
-function CameraRig({ level, regions }: { level: Level; regions: Region[] }) {
+function CameraRig({
+  level,
+  regions,
+  controlsRef,
+  resetRef,
+}: {
+  level: Level
+  regions: Region[]
+  controlsRef: React.MutableRefObject<any>
+  resetRef?: React.MutableRefObject<(() => void) | null>
+}) {
   const { camera, gl, size, invalidate } = useThree()
-  const controlsRef = useRef<any>(null)
   const maxHeight = useMemo(() => Math.max(0.7, ...regions.map((region) => boxHeight(region.clueValue)), ...level.clues.map((clue) => boxHeight(clue.value))), [level.clues, regions])
   const bounds = useMemo(() => createBoardBounds(level.rows, level.cols, maxHeight), [level.cols, level.rows, maxHeight])
 
@@ -77,7 +86,11 @@ function CameraRig({ level, regions }: { level: Level; regions: Region[] }) {
       controlsRef.current.update()
     }
     invalidate()
-  }, [bounds, camera, gl, invalidate, size.height, size.width])
+  }, [bounds, camera, gl, invalidate, size.height, size.width, controlsRef])
+
+  if (resetRef) {
+    resetRef.current = applyFrame
+  }
 
   const mounted = useRef(false)
   useLayoutEffect(() => {
@@ -85,6 +98,63 @@ function CameraRig({ level, regions }: { level: Level; regions: Region[] }) {
     const timer = setTimeout(applyFrame, 150)
     return () => clearTimeout(timer)
   }, [applyFrame])
+
+  // Capture phase pointerdown check: if user taps on the board, lock rotation hard!
+  useEffect(() => {
+    const dom = gl.domElement
+    const raycaster = new THREE.Raycaster()
+
+    const checkPointOnBoard = (clientX: number, clientY: number) => {
+      const rect = dom.getBoundingClientRect()
+      if (rect.width <= 0 || rect.height <= 0) return false
+      const ndcX = ((clientX - rect.left) / rect.width) * 2 - 1
+      const ndcY = -(((clientY - rect.top) / rect.height) * 2 - 1)
+      raycaster.setFromCamera({ x: ndcX, y: ndcY }, camera)
+      const ray = raycaster.ray
+      if (Math.abs(ray.direction.y) > 1e-5) {
+        const t = -ray.origin.y / ray.direction.y
+        if (t > 0) {
+          const hitX = ray.origin.x + t * ray.direction.x
+          const hitZ = ray.origin.z + t * ray.direction.z
+          const margin = 0.2
+          const halfW = level.cols / 2 + margin
+          const halfH = level.rows / 2 + margin
+          return Math.abs(hitX) <= halfW && Math.abs(hitZ) <= halfH
+        }
+      }
+      return false
+    }
+
+    const handlePointerDown = (event: PointerEvent) => {
+      if (checkPointOnBoard(event.clientX, event.clientY)) {
+        // User touching the board -> lock rotation HARD immediately
+        if (controlsRef.current) {
+          controlsRef.current.enabled = false
+        }
+      } else {
+        // User touching outside the board -> allow smooth rotation
+        if (controlsRef.current) {
+          controlsRef.current.enabled = true
+        }
+      }
+    }
+
+    const handlePointerUp = () => {
+      if (controlsRef.current) {
+        controlsRef.current.enabled = true
+      }
+    }
+
+    dom.addEventListener("pointerdown", handlePointerDown, { capture: true })
+    window.addEventListener("pointerup", handlePointerUp)
+    window.addEventListener("pointercancel", handlePointerUp)
+
+    return () => {
+      dom.removeEventListener("pointerdown", handlePointerDown, { capture: true })
+      window.removeEventListener("pointerup", handlePointerUp)
+      window.removeEventListener("pointercancel", handlePointerUp)
+    }
+  }, [camera, gl.domElement, level.cols, level.rows, controlsRef])
 
   return (
     <OrbitControls
@@ -95,17 +165,23 @@ function CameraRig({ level, regions }: { level: Level; regions: Region[] }) {
       enableRotate
       enableDamping
       dampingFactor={0.08}
-      rotateSpeed={0.65}
+      rotateSpeed={0.7}
       zoomSpeed={0.7}
-      minPolarAngle={0.62}
-      maxPolarAngle={1.28}
-      minAzimuthAngle={-Math.PI * 0.85}
-      maxAzimuthAngle={Math.PI * 0.85}
-      minZoom={Math.max(0.01, camera.zoom * 0.55)}
-      maxZoom={Math.max(2, camera.zoom * 2.2)}
-      mouseButtons={{ LEFT: undefined, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE }}
-      // ponytail: single finger rotates camera on touch devices; two fingers pinch-zoom/pan
-      touches={{ ONE: THREE.TOUCH.ROTATE, TWO: THREE.TOUCH.DOLLY_PAN }}
+      minPolarAngle={0.45}
+      maxPolarAngle={1.32}
+      minAzimuthAngle={-Math.PI * 0.9}
+      maxAzimuthAngle={Math.PI * 0.9}
+      minZoom={Math.max(0.01, camera.zoom * 0.5)}
+      maxZoom={Math.max(2, camera.zoom * 2.5)}
+      mouseButtons={{
+        LEFT: THREE.MOUSE.ROTATE,
+        MIDDLE: THREE.MOUSE.DOLLY,
+        RIGHT: THREE.MOUSE.ROTATE,
+      }}
+      touches={{
+        ONE: THREE.TOUCH.ROTATE,
+        TWO: THREE.TOUCH.DOLLY_PAN,
+      }}
       onChange={() => invalidate()}
     />
   )
@@ -194,6 +270,7 @@ function ClueLabels({
               outlineWidth={0.022}
               outlineColor={region ? "#ffffff" : isHighlighted ? "#bfdbfe" : "#ffffff"}
               fontWeight="bold"
+              raycast={() => null}
             >
               {clue.value}
             </Text>
@@ -248,7 +325,10 @@ function BoardInteraction({
   onPlaceRegion,
   onRemoveRegion,
   gameStatus,
-}: Omit<Props, "hintRegion" | "boardRevision" | "tutorialTarget" | "highlightClue">) {
+  controlsRef,
+}: Omit<Props, "hintRegion" | "boardRevision" | "tutorialTarget" | "highlightClue"> & {
+  controlsRef: React.MutableRefObject<any>
+}) {
   const [selection, setSelection] = useState<Selection | null>(null)
   const startRef = useRef<{ row: number; col: number } | null>(null)
   const movedRef = useRef(false)
@@ -314,6 +394,10 @@ function BoardInteraction({
           if (disabled || event.button !== 0 || !event.isPrimary) return
           event.stopPropagation()
           capturePointer(event)
+          // Lock rotation HARD as soon as user touches board
+          if (controlsRef.current) {
+            controlsRef.current.enabled = false
+          }
           const cell = cellFromPoint(event.point)
           startRef.current = cell
           movedRef.current = false
@@ -329,6 +413,9 @@ function BoardInteraction({
           event.stopPropagation()
           capturePointer(event, true)
           finish()
+          if (controlsRef.current) {
+            controlsRef.current.enabled = true
+          }
         }}
         onPointerCancel={(event) => {
           event.stopPropagation()
@@ -337,6 +424,9 @@ function BoardInteraction({
           selectionRef.current = null
           movedRef.current = false
           setSelection(null)
+          if (controlsRef.current) {
+            controlsRef.current.enabled = true
+          }
         }}
       >
         <planeGeometry args={[level.cols, level.rows]} />
@@ -388,7 +478,13 @@ function SelectionPreview({
   )
 }
 
-function Board3DScene({ props }: { props: Props }) {
+function Board3DScene({
+  props,
+  resetRef,
+}: {
+  props: Props
+  resetRef: React.MutableRefObject<(() => void) | null>
+}) {
   const {
     level,
     regions,
@@ -399,12 +495,19 @@ function Board3DScene({ props }: { props: Props }) {
     tutorialTarget,
     highlightClue,
   } = props
+  const controlsRef = useRef<any>(null)
+
   return (
     <>
       <color attach="background" args={["#faf7f0"]} />
       <ambientLight intensity={1.55} />
       <directionalLight position={[4, 8, 5]} intensity={2.1} />
-      <CameraRig level={level} regions={regions} />
+      <CameraRig
+        level={level}
+        regions={regions}
+        controlsRef={controlsRef}
+        resetRef={resetRef}
+      />
       <CellGrid level={level} regions={regions} />
       <PlacedRegions level={level} regions={regions} />
       <TutorialGuide level={level} target={tutorialTarget} />
@@ -416,25 +519,70 @@ function Board3DScene({ props }: { props: Props }) {
         gameStatus={gameStatus}
         onPlaceRegion={onPlaceRegion}
         onRemoveRegion={onRemoveRegion}
+        controlsRef={controlsRef}
       />
     </>
   )
 }
 
 export default function Board3DViewport(props: Props) {
-  return <div onContextMenu={(event) => event.preventDefault()} style={{ width: "100%", height: "100%", minHeight: 0, position: "relative", touchAction: "none" }}>
-    <Canvas
-      orthographic
-      frameloop="always"
-      dpr={[1, 2]}
-      gl={{ antialias: true, powerPreference: "default" }}
-      camera={{ position: [8, 8, 8], zoom: 1, near: 0.1, far: 100 }}
-      onCreated={({ gl }) => { gl.domElement.dataset.rendererCount = "1" }}
-      fallback={<div role="alert" style={{ display: "grid", placeItems: "center", height: "100%" }}>3D board unavailable</div>}
+  const resetRef = useRef<(() => void) | null>(null)
+
+  return (
+    <div
+      onContextMenu={(event) => event.preventDefault()}
+      style={{
+        width: "100%",
+        height: "100%",
+        minHeight: 0,
+        position: "relative",
+        touchAction: "none",
+      }}
     >
-      <Suspense fallback={null}>
-        <Board3DScene props={props} />
-      </Suspense>
-    </Canvas>
-  </div>
+      <Canvas
+        orthographic
+        frameloop="always"
+        dpr={[1, 2]}
+        gl={{ antialias: true, powerPreference: "default" }}
+        camera={{ position: [8, 8, 8], zoom: 1, near: 0.1, far: 100 }}
+        onCreated={({ gl }) => {
+          gl.domElement.dataset.rendererCount = "1"
+        }}
+        fallback={
+          <div role="alert" style={{ display: "grid", placeItems: "center", height: "100%" }}>
+            3D board unavailable
+          </div>
+        }
+      >
+        <Suspense fallback={null}>
+          <Board3DScene props={props} resetRef={resetRef} />
+        </Suspense>
+      </Canvas>
+
+      {/* Floating quick button to reset 3D view back to default isometric framing */}
+      <button
+        type="button"
+        onClick={() => resetRef.current?.()}
+        className="absolute bottom-3 right-3 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white/90 hover:bg-white text-stone-700 text-xs font-medium shadow-md border border-stone-200/80 backdrop-blur-xs transition-all hover:scale-105 active:scale-95 select-none z-10 cursor-pointer"
+        title="Reset 3D camera angle"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="13"
+          height="13"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="text-stone-500"
+        >
+          <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+          <path d="M3 3v5h5" />
+        </svg>
+        <span>Reset 3D</span>
+      </button>
+    </div>
+  )
 }
