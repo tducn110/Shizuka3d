@@ -16,22 +16,34 @@ import { AlertCircle, CheckCircle } from "lucide-react"
 
 const TUTORIAL_STEPS = [
   {
+    mode: "place" as const,
     clue: { row: 0, col: 0 },
     target: { row: 0, col: 0, width: 3, height: 1 },
     instructionKey: "tutorial.step1",
-    successKey: "tutorial.step1Success",
   },
   {
+    mode: "remove" as const,
+    clue: { row: 0, col: 0 },
+    target: { row: 0, col: 0, width: 3, height: 1 },
+    instructionKey: "tutorial.step2",
+  },
+  {
+    mode: "place" as const,
+    clue: { row: 0, col: 0 },
+    target: { row: 0, col: 0, width: 3, height: 1 },
+    instructionKey: "tutorial.step3",
+  },
+  {
+    mode: "place" as const,
     clue: { row: 1, col: 0 },
     target: { row: 1, col: 0, width: 1, height: 2 },
-    instructionKey: "tutorial.step2",
-    successKey: "tutorial.step2Success",
+    instructionKey: "tutorial.step4",
   },
   {
+    mode: "place" as const,
     clue: { row: 1, col: 1 },
     target: { row: 1, col: 1, width: 2, height: 2 },
-    instructionKey: "tutorial.step3",
-    successKey: "tutorial.complete",
+    instructionKey: "tutorial.step5",
   },
 ]
 
@@ -41,6 +53,7 @@ export default function GameScreen() {
   const [showLeaderboard, setShowLeaderboard] = useState(false)
   const [showHowToPlay, setShowHowToPlay] = useState(false)
   const [feedback, setFeedback] = useState<{ message: string; type: "error" | "success" | "warning" } | null>(null)
+  const [tutorialStage, setTutorialStage] = useState(0)
   const feedbackTimerRef = useRef<NodeJS.Timeout | null>(null)
   const transitionPendingRef = useRef(false)
   const wink = useWinkIntegration()
@@ -57,10 +70,61 @@ export default function GameScreen() {
   const hints = useHintController(match.level, playMove.regions)
 
   const isTutorial = match.level.id <= 2
-  const tutorialStepIndex = match.level.id === 1 ? Math.min(2, playMove.regions.length) : -1
-  const tutorialStep = match.level.id === 1 ? TUTORIAL_STEPS[tutorialStepIndex] : null
-  const tutorialTarget = match.level.id === 1 ? tutorialStep?.target : null
-  const highlightClue = match.level.id === 1 ? tutorialStep?.clue : null
+  let currentTutorialStep = null
+  let tutorialTarget: any = null
+  let tutorialMode: "place" | "remove" = "place"
+  let highlightClue: { row: number; col: number } | null = null
+  let currentStepNumber = 1
+
+  if (match.level.id === 1 && match.status === "playing") {
+    if (tutorialStage === 0) {
+      currentTutorialStep = TUTORIAL_STEPS[0]
+      tutorialTarget = currentTutorialStep.target
+      highlightClue = currentTutorialStep.clue
+      tutorialMode = "place"
+      currentStepNumber = 1
+    } else if (tutorialStage === 1) {
+      currentTutorialStep = TUTORIAL_STEPS[1]
+      tutorialTarget = currentTutorialStep.target
+      highlightClue = currentTutorialStep.clue
+      tutorialMode = "remove"
+      currentStepNumber = 2
+    } else if (tutorialStage >= 2 && tutorialStage < 5) {
+      const hasTarget0 = playMove.regions.some(
+        (r) => r.row === 0 && r.col === 0 && r.width === 3 && r.height === 1,
+      )
+      const hasTarget1 = playMove.regions.some(
+        (r) => r.row === 1 && r.col === 0 && r.width === 1 && r.height === 2,
+      )
+      const hasTarget2 = playMove.regions.some(
+        (r) => r.row === 1 && r.col === 1 && r.width === 2 && r.height === 2,
+      )
+
+      if (!hasTarget0) {
+        currentTutorialStep = TUTORIAL_STEPS[2]
+        tutorialTarget = currentTutorialStep.target
+        highlightClue = currentTutorialStep.clue
+        tutorialMode = "place"
+        currentStepNumber = 3
+      } else if (!hasTarget1) {
+        currentTutorialStep = TUTORIAL_STEPS[3]
+        tutorialTarget = currentTutorialStep.target
+        highlightClue = currentTutorialStep.clue
+        tutorialMode = "place"
+        currentStepNumber = 4
+      } else if (!hasTarget2) {
+        currentTutorialStep = TUTORIAL_STEPS[4]
+        tutorialTarget = currentTutorialStep.target
+        highlightClue = currentTutorialStep.clue
+        tutorialMode = "place"
+        currentStepNumber = 5
+      } else {
+        currentTutorialStep = null
+        tutorialTarget = null
+        highlightClue = null
+      }
+    }
+  }
 
   const handlePlaceRegion = useCallback((region: any) => {
     if (!roundStartedRef.current) {
@@ -75,15 +139,15 @@ export default function GameScreen() {
         feedbackTimerRef.current = setTimeout(() => setFeedback(null), 2500)
       }
     } else {
+      setFeedback(null)
       if (match.level.id === 1) {
-        const step = TUTORIAL_STEPS[playMove.regions.length]
-        if (step) {
-          setFeedback({ message: t(step.successKey), type: "success" })
-          if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current)
-          feedbackTimerRef.current = setTimeout(() => setFeedback(null), 2500)
-        }
-      } else {
-        setFeedback((prev) => (prev?.type === "error" ? null : prev))
+        setTutorialStage((prev) => {
+          if (prev === 0) return 1
+          if (prev === 2) return 3
+          if (prev === 3) return 4
+          if (prev === 4) return 5
+          return prev
+        })
       }
     }
     return result
@@ -114,7 +178,13 @@ export default function GameScreen() {
     }
     setFeedback(null)
     playMove.removeRegion(id)
-  }, [wink, playMove])
+    if (match.level.id === 1) {
+      setTutorialStage((prev) => {
+        if (prev === 1) return 2
+        return prev
+      })
+    }
+  }, [wink, playMove, match.level.id])
 
   // Stop round on unmount if active
   useEffect(() => {
@@ -137,7 +207,6 @@ export default function GameScreen() {
         roundStartedRef.current = false
       }
       wink.submitFinalScore({ score: match.level.id * 100 })
-      wink.track("puzzle_complete", { level: match.level.id })
     }
   }, [match.status, match.level.id, wink])
 
@@ -155,6 +224,7 @@ export default function GameScreen() {
     playMove.clear()
     hints.clear()
     setFeedback(null)
+    setTutorialStage(0)
   }, [match.boardRevision])
 
   const skipTutorial = useCallback(() => {
@@ -162,6 +232,7 @@ export default function GameScreen() {
     setLevelIndex(next)
     match.loadLevel(LEVELS[next])
     setFeedback(null)
+    setTutorialStage(0)
     roundStartedRef.current = false
   }, [match])
 
@@ -169,6 +240,7 @@ export default function GameScreen() {
     setLevelIndex(0) // Jump to Level 1
     match.loadLevel(LEVELS[0])
     setFeedback(null)
+    setTutorialStage(0)
     roundStartedRef.current = false
   }, [match])
 
@@ -274,7 +346,7 @@ export default function GameScreen() {
             )}
             <span>{feedback.message}</span>
           </div>
-        ) : match.level.id === 1 && tutorialStep ? (
+        ) : match.level.id === 1 && currentTutorialStep ? (
           <div
             style={{
               display: "flex",
@@ -282,9 +354,9 @@ export default function GameScreen() {
               gap: 8,
               padding: "6px 14px",
               borderRadius: 12,
-              background: "#eff6ff",
-              border: "1px solid #bfdbfe",
-              color: "#1e40af",
+              background: tutorialMode === "remove" ? "#fff7ed" : "#eff6ff",
+              border: `1px solid ${tutorialMode === "remove" ? "#fed7aa" : "#bfdbfe"}`,
+              color: tutorialMode === "remove" ? "#9a3412" : "#1e40af",
               fontSize: 13,
               fontWeight: 600,
               boxShadow: "0 2px 8px rgba(0,0,0,0.04)",
@@ -293,7 +365,7 @@ export default function GameScreen() {
           >
             <span
               style={{
-                background: "#2563eb",
+                background: tutorialMode === "remove" ? "#ea580c" : "#2563eb",
                 color: "#fff",
                 borderRadius: 8,
                 padding: "1px 6px",
@@ -301,9 +373,9 @@ export default function GameScreen() {
                 fontWeight: 700,
               }}
             >
-              {tutorialStepIndex + 1}/3
+              {currentStepNumber}/5
             </span>
-            <span>{t(tutorialStep.instructionKey)}</span>
+            <span>{t(currentTutorialStep.instructionKey)}</span>
           </div>
         ) : match.level.id === 2 ? (
           <div
@@ -349,6 +421,8 @@ export default function GameScreen() {
             onPlaceRegion={handlePlaceRegion}
             onRemoveRegion={handleRemoveRegion}
             tutorialTarget={tutorialTarget}
+            tutorialMode={tutorialMode}
+            tutorialPrompt={t("tutorial.tapPrompt")}
             highlightClue={highlightClue}
           />
         </div>

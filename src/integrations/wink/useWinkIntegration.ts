@@ -1,337 +1,336 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react"
+import i18n from "../../i18n"
 import type {
-  WinkCapability,
   WinkIntegration,
   WinkIntegrationError,
   WinkIntegrationErrorCode,
   WinkLeaderboardEntry,
+  WinkLocale,
   WinkMode,
   WinkPhase,
   WinkSDK,
   WinkStatus,
   WinkSubmitScoreResult,
-} from "./types";
+} from "./types"
 
 const SAFE_ERROR_MESSAGES: Record<WinkIntegrationErrorCode, string> = {
-  PARENT_REQUIRED: "Mini-game phải được mở trong iframe Wink.",
-  BRIDGE_READY_TIMEOUT: "Không thể khởi tạo kết nối với Wink.",
-  PROTOCOL_MISMATCH: "Phiên bản giao thức Wink không tương thích.",
-  RUNTIME_CONFIG_INVALID: "Cấu hình mini-game không hợp lệ.",
-  SESSION_CREATE_FAILED: "Không thể tạo phiên chơi.",
-  SESSION_RENEWAL_FAILED: "Không thể gia hạn phiên chơi.",
-  SESSION_EXPIRED: "Phiên chơi đã hết hạn.",
-  CAPABILITY_DENIED: "Thao tác này không được cấp quyền cho phiên hiện tại.",
   API_NETWORK_ERROR: "Không thể kết nối dịch vụ Wink.",
-  MESSAGE_REJECTED: "Thông điệp từ Wink không hợp lệ.",
-  BRIDGE_MISSING: "Wink SDK chưa sẵn sàng.",
   INVALID_SCORE: "Điểm số cuối không hợp lệ.",
-  INVALID_ROUND: "Mã vòng chơi không hợp lệ.",
-};
+}
 
 function safeError(
   code: WinkIntegrationErrorCode,
   retryable = false,
 ): WinkIntegrationError {
-  return Object.freeze({
-    code,
-    message: SAFE_ERROR_MESSAGES[code] || "Lỗi kết nối Wink.",
-    retryable,
-  });
+  return Object.freeze({ code, message: SAFE_ERROR_MESSAGES[code], retryable })
 }
 
-// Global bootstrap promise so multiple hook instances share the same initialization
-let globalInitPromise: Promise<WinkSDK | null> | null = null;
-let lastTargetWink: unknown = undefined;
+/** Host locales are normalized before they reach the single shared i18n instance. */
+export function normalizeWinkLocale(
+  value: string | null | undefined,
+): WinkLocale {
+  return value?.toLowerCase().startsWith("vi") ? "vi" : "en"
+}
+
+let globalInitPromise: Promise<WinkSDK | null> | null = null
+let lastTargetWink: unknown = undefined
+let isResolving = false
+let activeTimerCleanup: (() => void) | null = null
 
 export function resetGlobalWinkInit(): void {
-  globalInitPromise = null;
-  lastTargetWink = undefined;
+  if (activeTimerCleanup) {
+    activeTimerCleanup()
+    activeTimerCleanup = null
+  }
+  globalInitPromise = null
+  lastTargetWink = undefined
+  isResolving = false
 }
 
 export function resolveGlobalWink(): Promise<WinkSDK | null> {
-  const currentWink = typeof window !== "undefined" ? window.Wink : undefined;
-  if (globalInitPromise && lastTargetWink === currentWink) {
-    return globalInitPromise;
+  const currentWink = typeof window === "undefined" ? undefined : window.Wink
+  if (globalInitPromise) {
+    if (isResolving || lastTargetWink === currentWink) {
+      return globalInitPromise
+    }
   }
-  lastTargetWink = currentWink;
 
-  globalInitPromise = new Promise((resolve) => {
+  isResolving = true
+  lastTargetWink = currentWink
+  globalInitPromise = new Promise<WinkSDK | null>((resolve) => {
     if (typeof window === "undefined") {
-      resolve(null);
-      return;
+      isResolving = false
+      resolve(null)
+      return
     }
 
-    const checkSdk = () => {
-      if (window.Wink?.init) {
-        window.Wink.init()
-          .then((sdk) => resolve(sdk))
-          .catch(() => resolve(window.Wink || null));
-        return true;
+    let isSettled = false
+    const finish = (result: WinkSDK | null) => {
+      if (isSettled) return
+      isSettled = true
+      isResolving = false
+      lastTargetWink = typeof window !== "undefined" ? window.Wink : undefined
+      if (activeTimerCleanup) {
+        activeTimerCleanup()
+        activeTimerCleanup = null
       }
-      return false;
-    };
+      resolve(result)
+    }
 
-    if (checkSdk()) return;
-
-    // In test environment, don't wait 2.5s if not in browser
-    const maxWaitMs = typeof process !== "undefined" && process.env.NODE_ENV === "test" ? 100 : 2000;
-    let elapsed = 0;
-    const interval = setInterval(() => {
-      elapsed += 25;
-      if (checkSdk() || elapsed >= maxWaitMs) {
-        clearInterval(interval);
-        resolve(window.Wink || null);
+    const startInit = (sdk: WinkSDK): boolean => {
+      if (!sdk || typeof sdk.init !== "function") return false
+      try {
+        void sdk
+          .init()
+          .then((session) => finish(session ?? sdk))
+          .catch(() => finish(null))
+        return true
+      } catch {
+        finish(null)
+        return true
       }
-    }, 25);
-  });
+    }
 
-  return globalInitPromise;
+    const initialSdk = window.Wink
+    if (initialSdk && startInit(initialSdk)) {
+      return
+    }
+
+    const timerFn = typeof setInterval === "function" ? setInterval : undefined
+    const clearFn =
+      typeof clearInterval === "function" ? clearInterval : undefined
+
+    if (!timerFn || !clearFn) {
+      finish(null)
+      return
+    }
+
+    const maxWaitMs =
+      typeof process !== "undefined" && process.env.NODE_ENV === "test"
+        ? 100
+        : 2000
+    let elapsed = 0
+    let intervalId: ReturnType<typeof setInterval> | null = null
+
+    const stopInterval = () => {
+      if (intervalId !== null) {
+        clearFn(intervalId)
+        intervalId = null
+      }
+    }
+
+    activeTimerCleanup = stopInterval
+
+    intervalId = timerFn(() => {
+      elapsed += 25
+      const candidate = typeof window !== "undefined" ? window.Wink : undefined
+      if (candidate && startInit(candidate)) {
+        stopInterval()
+        activeTimerCleanup = null
+        return
+      }
+
+      if (elapsed >= maxWaitMs) {
+        stopInterval()
+        activeTimerCleanup = null
+        finish(null)
+      }
+    }, 25)
+  })
+
+  return globalInitPromise
 }
 
 export function useWinkIntegration(): WinkIntegration {
-  const [sdk, setSdk] = useState<WinkSDK | null>(typeof window !== "undefined" ? window.Wink || null : null);
-  const [status, setStatus] = useState<WinkStatus>(sdk?.status ?? "connecting");
-  const [isReady, setIsReady] = useState(false);
-  const [hostPaused, setHostPaused] = useState(false);
-  const [parentMuted, setParentMuted] = useState(sdk?.muted ?? false);
-  const [locale, setLocale] = useState(sdk?.locale ?? "vi");
-  const [error, setError] = useState<WinkIntegrationError | null>(null);
-  const [personalBest, setPersonalBest] = useState<WinkLeaderboardEntry | null>(null);
-  const [leaderboard, setLeaderboard] = useState<readonly WinkLeaderboardEntry[]>([]);
+  const [status, setStatus] = useState<WinkStatus>("connecting")
+  const [isReady, setIsReady] = useState(false)
+  const [hostPaused, setHostPaused] = useState(false)
+  const [hostMuted, setHostMuted] = useState(false)
+  const [locale, setLocale] = useState<WinkLocale>(() =>
+    normalizeWinkLocale(i18n.resolvedLanguage),
+  )
+  const [error, setError] = useState<WinkIntegrationError | null>(null)
+  const [personalBest, setPersonalBest] = useState<WinkLeaderboardEntry | null>(
+    null,
+  )
+  const [leaderboard, setLeaderboard] =
+    useState<readonly WinkLeaderboardEntry[]>([])
+  const sdkRef = useRef<WinkSDK | null>(null)
 
-  const sdkRef = useRef<WinkSDK | null>(sdk);
-  sdkRef.current = sdk;
-
-  useEffect(() => {
-    let unmounted = false;
-    const cleanups: Array<() => void> = [];
-
-    void resolveGlobalWink().then((resolvedSdk) => {
-      if (unmounted) return;
-      if (resolvedSdk) {
-        setSdk(resolvedSdk);
-        setStatus(resolvedSdk.status);
-        setParentMuted(resolvedSdk.muted);
-        if (resolvedSdk.locale) {
-          setLocale(resolvedSdk.locale);
-        }
-
-        try {
-          cleanups.push(
-            resolvedSdk.on("pause", () => {
-              setHostPaused(true);
-            }),
-          );
-          cleanups.push(
-            resolvedSdk.on("resume", () => {
-              setHostPaused(false);
-            }),
-          );
-          cleanups.push(
-            resolvedSdk.on("mute", () => {
-              setParentMuted(true);
-            }),
-          );
-          cleanups.push(
-            resolvedSdk.on("unmute", () => {
-              setParentMuted(false);
-            }),
-          );
-          cleanups.push(
-            resolvedSdk.on("locale", (nextLocale: string) => {
-              setLocale(nextLocale);
-            }),
-          );
-        } catch (e) {
-          console.warn("[WinkIntegration] Error subscribing to SDK events", e);
-        }
-      } else {
-        setStatus("standalone");
-      }
-      setIsReady(true);
-    });
-
-    return () => {
-      unmounted = true;
-      cleanups.forEach((cleanup) => {
-        try {
-          cleanup();
-        } catch {}
-      });
-    };
-  }, []);
-
-  const can = useCallback(
-    (capability: WinkCapability): boolean => {
-      return sdkRef.current?.can(capability) ?? false;
+  const applyHostLocale = useCallback(
+    (nextLocale: string | null | undefined) => {
+      const normalized = normalizeWinkLocale(nextLocale)
+      setLocale(normalized)
+      void i18n.changeLanguage(normalized)
     },
     [],
-  );
+  )
+
+  useEffect(() => {
+    let active = true
+    let activeSdk: WinkSDK | null = null
+    const cleanups: Array<() => void> = []
+
+    void resolveGlobalWink().then((resolvedSdk) => {
+      if (!active) return
+      activeSdk = resolvedSdk
+      sdkRef.current = resolvedSdk
+
+      if (!resolvedSdk) {
+        setStatus("standalone")
+        setIsReady(true)
+        return
+      }
+
+      setStatus(resolvedSdk.status)
+      setHostMuted(Boolean(resolvedSdk.muted))
+      applyHostLocale(resolvedSdk.locale)
+      cleanups.push(
+        resolvedSdk.on("pause", () => setHostPaused(true)),
+        resolvedSdk.on("resume", () => setHostPaused(false)),
+        resolvedSdk.on("mute", () => setHostMuted(true)),
+        resolvedSdk.on("unmute", () => setHostMuted(false)),
+        resolvedSdk.on("locale", (nextLocale) =>
+          applyHostLocale(
+            typeof nextLocale === "string" ? nextLocale : undefined,
+          ),
+        ),
+      )
+      setIsReady(true)
+    })
+
+    return () => {
+      active = false
+      for (const cleanup of cleanups) {
+        try {
+          cleanup()
+        } catch {
+          // SDK cleanup is best-effort and must not affect the game runtime.
+        }
+      }
+      if (sdkRef.current === activeSdk) sdkRef.current = null
+      if (activeSdk) {
+        try {
+          activeSdk.destroy()
+        } catch {
+          // Disposal failure must not crash React unmount.
+        }
+      }
+      resetGlobalWinkInit()
+    }
+  }, [applyHostLocale])
 
   const gameplayStart = useCallback(() => {
     try {
-      sdkRef.current?.gameplayStart();
-    } catch (e) {
-      console.warn("[WinkIntegration] gameplayStart error", e);
+      sdkRef.current?.gameplayStart()
+    } catch {
+      // Standalone or an SDK failure must not block local play.
     }
-  }, []);
+  }, [])
 
   const gameplayStop = useCallback(() => {
     try {
-      sdkRef.current?.gameplayStop();
-    } catch (e) {
-      console.warn("[WinkIntegration] gameplayStop error", e);
+      sdkRef.current?.gameplayStop()
+    } catch {
+      // The semantic round is still ended locally if the SDK is unavailable.
     }
-  }, []);
+  }, [])
 
   const refreshLeaderboard = useCallback(async () => {
-    const currentSdk = sdkRef.current;
-    if (!currentSdk) {
-      setLeaderboard([]);
-      setPersonalBest(null);
-      return;
-    }
-
-    if (!currentSdk.can("getLeaderboard")) {
-      setLeaderboard([]);
-      setPersonalBest(null);
-      return;
+    const sdk = sdkRef.current
+    if (!sdk || !sdk.can("getLeaderboard")) {
+      setLeaderboard([])
+      setPersonalBest(null)
+      return
     }
 
     try {
-      const board = await currentSdk.getLeaderboard({ limit: 30 });
-      setLeaderboard(board.entries || []);
-      if (board.me) setPersonalBest(board.me);
-      setError(null);
-    } catch (err: any) {
-      console.warn("[WinkIntegration] getLeaderboard error", err);
-      setError(safeError("API_NETWORK_ERROR", true));
-      setLeaderboard([]);
+      const board = await sdk.getLeaderboard({ limit: 30 })
+      setLeaderboard(board.entries ?? [])
+      setPersonalBest(board.me ?? null)
+      setError(null)
+    } catch {
+      setError(safeError("API_NETWORK_ERROR", true))
+      setLeaderboard([])
     }
-  }, []);
+  }, [])
 
   const refreshPersonalBest = useCallback(async () => {
-    const currentSdk = sdkRef.current;
-    if (!currentSdk || !currentSdk.can("submitScore")) {
-      setPersonalBest(null);
-      return;
+    const sdk = sdkRef.current
+    if (!sdk || !sdk.can("submitScore")) {
+      setPersonalBest(null)
+      return
     }
 
     try {
-      const result = await currentSdk.getPersonalBest();
-      if (result?.me) setPersonalBest(result.me);
+      const result = await sdk.getPersonalBest()
+      setPersonalBest(result?.me ?? null)
     } catch {
-      // Ignored non-fatal in standalone or network glitch
+      // A dashboard can still render remote leaderboard data when this optional read fails.
     }
-  }, []);
+  }, [])
 
   const submitFinalScore = useCallback(
     async (input: {
-      roundId?: string;
-      score: number;
-      playTimeSec?: number;
-      qualifies?: boolean;
-      metadata?: Record<string, unknown>;
+      score: number
+      playTimeSec?: number
     }): Promise<WinkSubmitScoreResult | null> => {
-      const currentSdk = sdkRef.current;
-      if (input.qualifies === false) return null;
-      if (!currentSdk) return null;
-
-      if (!currentSdk.can("submitScore")) {
-        const denied = safeError("CAPABILITY_DENIED");
-        setError(denied);
-        return null;
+      const score = Math.trunc(input.score)
+      if (!Number.isFinite(score) || score < 0) {
+        setError(safeError("INVALID_SCORE"))
+        return null
       }
+
+      const sdk = sdkRef.current
+      if (!sdk || !sdk.can("submitScore")) return null
 
       try {
-        const response = await currentSdk.submitScore({
-          score: input.score,
-          playTime: input.playTimeSec ?? 0,
-          metadata: {
-            roundId: input.roundId,
-            ...input.metadata,
-          },
-        });
-        if (response?.entry) {
-          setPersonalBest(response.entry);
-        }
-        setError(null);
+        const response = await sdk.submitScore({
+          score,
+          playTime: Math.max(0, Math.trunc(input.playTimeSec ?? 0)),
+        })
+        setPersonalBest(response.entry ?? null)
+        setError(null)
+        void refreshLeaderboard()
+        void refreshPersonalBest()
         return {
-          entry: response?.entry ?? null,
-          isNewBest: Boolean(response?.isNewBest),
-          previousBest: response?.previousBest ?? null,
-        };
-      } catch (err: any) {
-        console.warn("[WinkIntegration] submitScore error", err);
-        const netErr = safeError("API_NETWORK_ERROR", true);
-        setError(netErr);
-        return null;
+          entry: response.entry ?? null,
+          isNewBest: Boolean(response.isNewBest),
+          previousBest: response.previousBest ?? null,
+        }
+      } catch {
+        setError(safeError("API_NETWORK_ERROR", true))
+        return null
       }
     },
-    [],
-  );
+    [refreshLeaderboard, refreshPersonalBest],
+  )
 
-  const completeRound = useCallback(
-    async (_input?: { roundId?: string; playDurationMs?: number }) => {
-      gameplayStop();
-    },
-    [gameplayStop],
-  );
-
-  const track = useCallback(
-    (eventName: string, properties?: Record<string, unknown>) => {
-      const currentSdk = sdkRef.current;
-      if (currentSdk && currentSdk.can("track")) {
-        currentSdk.track(eventName, properties).catch((err) => {
-          console.warn("[WinkIntegration] track error", err);
-        });
-      }
-    },
-    [],
-  );
-
-  const mode: WinkMode = status === "standalone" ? "offline" : "wink";
-  const phase: WinkPhase =
-    status === "connecting"
-      ? "booting"
-      : status === "online"
-        ? sdk?.player?.isGuest
-          ? "ready_anonymous"
-          : "ready_authenticated"
-        : status === "connected"
-          ? "ready_anonymous"
-          : "ready_anonymous";
-
-  const bestScore = personalBest?.score ?? 0;
-  const playerEntry = personalBest;
-  const displayName = sdk?.player?.displayName ?? null;
-  const canSubmitScore = can("submitScore");
+  const mode: WinkMode = status === "standalone" ? "offline" : "wink"
+  const phase: WinkPhase = !isReady
+    ? "booting"
+    : sdkRef.current?.player?.isGuest === false
+      ? "ready_authenticated"
+      : "ready_anonymous"
 
   return {
+    readyPromise: resolveGlobalWink(),
     status,
     isReady,
-    readyPromise: resolveGlobalWink(),
-    sdk,
     mode,
     phase,
     hostPaused,
-    parentMuted,
+    hostMuted,
     locale,
     error,
     leaderboard,
     personalBest,
-    playerEntry,
-    displayName,
-    bestScore,
-    canSubmitScore,
-    can,
+    displayName: sdkRef.current?.player?.displayName ?? null,
+    canSubmitScore: sdkRef.current?.can("submitScore") ?? false,
     gameplayStart,
     gameplayStop,
     refreshLeaderboard,
     refreshPersonalBest,
-    fetchPersonalBest: refreshPersonalBest,
     submitFinalScore,
-    completeRound,
-    track,
-  };
+  }
 }

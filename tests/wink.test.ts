@@ -17,7 +17,6 @@ async function run() {
   // 2. Connected mode
   let gameplayStartCalled = false;
   let gameplayStopCalled = false;
-  let trackCalled = false;
 
   const mockSdk: Partial<WinkSDK> = {
     init: async () => mockSdk as WinkSDK,
@@ -26,9 +25,6 @@ async function run() {
     },
     gameplayStop: () => {
       gameplayStopCalled = true;
-    },
-    track: async () => {
-      trackCalled = true;
     },
     can: () => true,
     status: "online",
@@ -45,9 +41,6 @@ async function run() {
 
   connectedSdk?.gameplayStop?.();
   assert(gameplayStopCalled, "gameplayStop works");
-
-  connectedSdk?.track?.("puzzle_complete", { level: 1 });
-  assert(trackCalled, "track works");
 
   console.log("ALL WINK INTEGRATION TESTS PASSED (09_shikaku)");
 }

@@ -1,11 +1,26 @@
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
 
-const LANGUAGE_STORAGE_KEY = "fruit-slashing-language";
+const LANGUAGE_STORAGE_KEY = "09-shikaku-language";
 type SupportedLanguage = "vi" | "en";
 const isSupportedLanguage = (value: string | null): value is SupportedLanguage => value === "vi" || value === "en";
 const DEFAULT_LANGUAGE: SupportedLanguage = "en";
-const getInitialLanguage = (): SupportedLanguage => { if (typeof window === "undefined") return DEFAULT_LANGUAGE; try { const value = window.localStorage.getItem(LANGUAGE_STORAGE_KEY); return isSupportedLanguage(value) ? value : DEFAULT_LANGUAGE; } catch { return DEFAULT_LANGUAGE; } };
+const getInitialLanguage = (): SupportedLanguage => {
+  if (typeof window === 'undefined') return 'en';
+  try {
+    const value = window.localStorage.getItem(LANGUAGE_STORAGE_KEY);
+    if (isSupportedLanguage(value)) return value;
+  } catch {
+    // Storage read failure fallback
+  }
+  // Contract: Wink-hosted initial language = Wink.locale if supported, otherwise English.
+  const winkLocale = (window as any).Wink?.locale;
+  if (typeof winkLocale === 'string') {
+    const normalized = winkLocale.split('-')[0];
+    if (isSupportedLanguage(normalized)) return normalized;
+  }
+  return 'en';
+};
 const persistLanguage = (language: string): void => { const normalized = language.split("-")[0]; if (typeof window === "undefined" || !isSupportedLanguage(normalized)) return; try { window.localStorage.setItem(LANGUAGE_STORAGE_KEY, normalized); } catch { /* Optional persistence. */ } };
 
 const resources = {
@@ -35,11 +50,12 @@ const resources = {
         howToPlay: "Cách chơi",
       },
       tutorial: {
-        step1: "Kéo ngang bao phủ 3 ô cho số 3 (mỗi số là số ô của hình).",
-        step1Success: "Chính xác! Hình chữ nhật phải chứa đúng số ô bằng số gợi ý.",
-        step2: "Bây giờ kéo dọc bao phủ 2 ô cho số 2.",
-        step2Success: "Rất tốt! Mỗi hình chỉ được chứa duy nhất một số.",
-        step3: "Kéo bao phủ 4 ô cuối cùng để kín bàn cờ!",
+        step1: "Kéo bao phủ 3 ô cho số 3 để tạo khối.",
+        step2: "Chạm 1 lần nữa vào khối vừa tạo để hủy khối.",
+        step3: "Rất tốt! Giờ hãy kéo tạo lại khối 3 ô cho số 3.",
+        step4: "Bây giờ kéo dọc bao phủ 2 ô cho số 2.",
+        step5: "Kéo bao phủ 4 ô cuối cùng để phủ kín bàn cờ!",
+        tapPrompt: "👆 Chạm để hủy",
         level2Tip: "Nhớ rằng: các hình không được chồng lên nhau và phải phủ kín bàn cờ.",
         complete: "Tuyệt vời! Bạn đã nắm vững cách chơi Shikaku.",
       },
@@ -92,11 +108,12 @@ const resources = {
         howToPlay: "How to Play",
       },
       tutorial: {
-        step1: "Drag across to cover 3 cells for number 3 (each number is its cell area).",
-        step1Success: "Great! The rectangle must contain exactly this many cells.",
-        step2: "Now drag down to cover 2 cells for number 2.",
-        step2Success: "Well done! Each rectangle can only contain one number.",
-        step3: "Drag to cover the last 4 cells and fill the board!",
+        step1: "Drag across to cover 3 cells for number 3 to create a block.",
+        step2: "Tap the block once more to cancel/remove it.",
+        step3: "Well done! Now drag again to recreate the 3-cell block.",
+        step4: "Now drag down to cover 2 cells for number 2.",
+        step5: "Drag to cover the last 4 cells and fill the board!",
+        tapPrompt: "👆 Tap to remove",
         level2Tip: "Remember: rectangles cannot overlap and must cover the entire board.",
         complete: "Awesome! You have mastered the rules of Shikaku.",
       },

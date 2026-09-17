@@ -10,6 +10,8 @@ interface Props {
   onPlaceRegion: (selection: Selection) => any
   onRemoveRegion: (id: string) => void
   tutorialTarget?: RegionDef | null
+  tutorialMode?: "place" | "remove"
+  tutorialPrompt?: string
   highlightClue?: { row: number; col: number } | null
 }
 

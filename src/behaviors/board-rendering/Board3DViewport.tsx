@@ -9,9 +9,9 @@ import { createBoardBounds, frameBoard, projectBounds } from "../board-navigatio
 const MAT_OCCUPIED = new THREE.MeshStandardMaterial({ color: "#e4dbca", roughness: 0.9 })
 const MAT_FREE = new THREE.MeshStandardMaterial({ color: "#f8f3eb", roughness: 0.85 })
 const MAT_HINT = new THREE.MeshStandardMaterial({ color: "#e5ad38", transparent: true, opacity: 0.65, depthWrite: false })
-// Cobalt accent preview
 const MAT_PREVIEW_FILL = new THREE.MeshStandardMaterial({ color: "#2563eb", transparent: true, opacity: 0.28, depthWrite: false })
 const MAT_TUTORIAL_GUIDE = new THREE.MeshStandardMaterial({ color: "#2563eb", transparent: true, opacity: 0.25, depthWrite: false })
+const MAT_TUTORIAL_REMOVE = new THREE.MeshStandardMaterial({ color: "#ea580c", transparent: true, opacity: 0.35, depthWrite: false })
 const REGION_MATS = new Map<string, THREE.Material>()
 const getRegionMat = (c: string) => { if(!REGION_MATS.has(c)) REGION_MATS.set(c, new THREE.MeshStandardMaterial({ color: c, roughness: 0.65, metalness: 0.05 })); return REGION_MATS.get(c)! }
 
@@ -30,6 +30,8 @@ interface Props {
   onPlaceRegion: (selection: Selection) => any
   onRemoveRegion: (id: string) => void
   tutorialTarget?: RegionDef | null
+  tutorialMode?: "place" | "remove"
+  tutorialPrompt?: string
   highlightClue?: { row: number; col: number } | null
 }
 
@@ -99,63 +101,6 @@ function CameraRig({
     return () => clearTimeout(timer)
   }, [applyFrame])
 
-  // Capture phase pointerdown check: if user taps on the board, lock rotation hard!
-  useEffect(() => {
-    const dom = gl.domElement
-    const raycaster = new THREE.Raycaster()
-
-    const checkPointOnBoard = (clientX: number, clientY: number) => {
-      const rect = dom.getBoundingClientRect()
-      if (rect.width <= 0 || rect.height <= 0) return false
-      const ndcX = ((clientX - rect.left) / rect.width) * 2 - 1
-      const ndcY = -(((clientY - rect.top) / rect.height) * 2 - 1)
-      raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), camera)
-      const ray = raycaster.ray
-      if (Math.abs(ray.direction.y) > 1e-5) {
-        const t = -ray.origin.y / ray.direction.y
-        if (t > 0) {
-          const hitX = ray.origin.x + t * ray.direction.x
-          const hitZ = ray.origin.z + t * ray.direction.z
-          const margin = 0.2
-          const halfW = level.cols / 2 + margin
-          const halfH = level.rows / 2 + margin
-          return Math.abs(hitX) <= halfW && Math.abs(hitZ) <= halfH
-        }
-      }
-      return false
-    }
-
-    const handlePointerDown = (event: PointerEvent) => {
-      if (checkPointOnBoard(event.clientX, event.clientY)) {
-        // User touching the board -> lock rotation HARD immediately
-        if (controlsRef.current) {
-          controlsRef.current.enabled = false
-        }
-      } else {
-        // User touching outside the board -> allow smooth rotation
-        if (controlsRef.current) {
-          controlsRef.current.enabled = true
-        }
-      }
-    }
-
-    const handlePointerUp = () => {
-      if (controlsRef.current) {
-        controlsRef.current.enabled = true
-      }
-    }
-
-    dom.addEventListener("pointerdown", handlePointerDown, { capture: true })
-    window.addEventListener("pointerup", handlePointerUp)
-    window.addEventListener("pointercancel", handlePointerUp)
-
-    return () => {
-      dom.removeEventListener("pointerdown", handlePointerDown, { capture: true })
-      window.removeEventListener("pointerup", handlePointerUp)
-      window.removeEventListener("pointercancel", handlePointerUp)
-    }
-  }, [camera, gl.domElement, level.cols, level.rows, controlsRef])
-
   return (
     <OrbitControls
       ref={controlsRef}
@@ -211,12 +156,57 @@ function CellGrid({ level, regions }: { level: Level; regions: Region[] }) {
 }
 
 function PlacedRegions({ level, regions }: { level: Level; regions: Region[] }) {
-  return <group>{regions.map((region) => {
-    const height = boxHeight(region.clueValue)
-    return <group key={region.id} position={[region.col + region.width / 2 - level.cols / 2, height / 2, region.row + region.height / 2 - level.rows / 2]} scale={[region.width * 0.98, height, region.height * 0.98]}>
-      <SharedBox material={getRegionMat(region.color)} />
+  return (
+    <group>
+      {regions.map((region) => {
+        const height = boxHeight(region.clueValue)
+        const posX = region.col + region.width / 2 - level.cols / 2
+        const posZ = region.row + region.height / 2 - level.rows / 2
+        return (
+          <group key={region.id} position={[posX, height / 2, posZ]}>
+            <group scale={[region.width * 0.98, height, region.height * 0.98]}>
+              <SharedBox material={getRegionMat(region.color)} />
+              <lineSegments>
+                <edgesGeometry args={[UNIT_BOX_GEOMETRY]} />
+                <lineBasicMaterial color="#000000" transparent opacity={0.12} />
+              </lineSegments>
+            </group>
+            {/* Cell divider lines so multi-cell blocks show their constituent cells */}
+            {region.width > 1 &&
+              Array.from({ length: region.width - 1 }, (_, i) => {
+                const x = i + 1 - region.width / 2
+                return (
+                  <mesh
+                    key={`reg-div-x-${i}`}
+                    position={[x, height / 2 + 0.003, 0]}
+                    scale={[0.022, 0.005, region.height * 0.96]}
+                    raycast={() => null}
+                  >
+                    <boxGeometry args={[1, 1, 1]} />
+                    <meshBasicMaterial color="#000000" transparent opacity={0.16} />
+                  </mesh>
+                )
+              })}
+            {region.height > 1 &&
+              Array.from({ length: region.height - 1 }, (_, i) => {
+                const z = i + 1 - region.height / 2
+                return (
+                  <mesh
+                    key={`reg-div-z-${i}`}
+                    position={[0, height / 2 + 0.003, z]}
+                    scale={[region.width * 0.96, 0.005, 0.022]}
+                    raycast={() => null}
+                  >
+                    <boxGeometry args={[1, 1, 1]} />
+                    <meshBasicMaterial color="#000000" transparent opacity={0.16} />
+                  </mesh>
+                )
+              })}
+          </group>
+        )
+      })}
     </group>
-  })}</group>
+  )
 }
 
 function ClueLabels({
@@ -297,10 +287,72 @@ function HintMesh({ level, hintRegion }: { level: Level; hintRegion: RegionDef |
   )
 }
 
-function TutorialGuide({ level, target }: { level: Level; target?: RegionDef | null }) {
-  if (!target) return null
+function TutorialGuide({
+  level,
+  target,
+  mode = "place",
+  prompt,
+  isDragging = false,
+  regions,
+}: {
+  level: Level
+  target?: RegionDef | null
+  mode?: "place" | "remove"
+  prompt?: string
+  isDragging?: boolean
+  regions?: Region[]
+}) {
+  if (!target || isDragging) return null
+
+  // If in place mode, check if target is already placed so guide shuts off immediately
+  if (mode === "place" && regions) {
+    const isAlreadyPlaced = regions.some(
+      (r) =>
+        r.row === target.row &&
+        r.col === target.col &&
+        r.width === target.width &&
+        r.height === target.height,
+    )
+    if (isAlreadyPlaced) return null
+  }
+
   const width = target.width
   const depth = target.height
+
+  if (mode === "remove") {
+    return (
+      <group
+        position={[
+          target.col + width / 2 - level.cols / 2,
+          0.45,
+          target.row + depth / 2 - level.rows / 2,
+        ]}
+      >
+        <group scale={[width * 0.98, 0.16, depth * 0.98]}>
+          <SharedBox material={MAT_TUTORIAL_REMOVE} />
+          <lineSegments>
+            <edgesGeometry args={[UNIT_BOX_GEOMETRY]} />
+            <lineBasicMaterial color="#ea580c" />
+          </lineSegments>
+        </group>
+        <Text
+          position={[0, 0.35, 0]}
+          rotation={[-Math.PI / 2, 0, 0]}
+          fontSize={0.28}
+          color="#c2410c"
+          anchorX="center"
+          anchorY="middle"
+          outlineWidth={0.025}
+          outlineColor="#ffffff"
+          fontWeight="bold"
+          raycast={() => null}
+        >
+          {prompt || "👆 Chạm để hủy"}
+        </Text>
+      </group>
+    )
+  }
+
   return (
     <group
       position={[
@@ -326,13 +378,27 @@ function BoardInteraction({
   onRemoveRegion,
   gameStatus,
   controlsRef,
-}: Omit<Props, "hintRegion" | "boardRevision" | "tutorialTarget" | "highlightClue"> & {
+  onInteractStateChange,
+}: Omit<
+  Props,
+  | "hintRegion"
+  | "boardRevision"
+  | "tutorialTarget"
+  | "tutorialMode"
+  | "tutorialPrompt"
+  | "highlightClue"
+> & {
   controlsRef: React.MutableRefObject<any>
+  onInteractStateChange?: (interacting: boolean) => void
 }) {
+  const { camera, gl, invalidate } = useThree()
   const [selection, setSelection] = useState<Selection | null>(null)
   const startRef = useRef<{ row: number; col: number } | null>(null)
+  const startPosRef = useRef<{ x: number; y: number } | null>(null)
   const movedRef = useRef(false)
   const selectionRef = useRef<Selection | null>(null)
+  const isInteractingRef = useRef(false)
+
   const regionByCell = useMemo(() => {
     const map = new Map<string, Region>()
     for (const region of regions) {
@@ -345,113 +411,203 @@ function BoardInteraction({
     return map
   }, [regions])
 
-  const cellFromPoint = useCallback(
-    (point: THREE.Vector3) => ({
-      row: Math.max(0, Math.min(level.rows - 1, Math.floor(point.z + level.rows / 2))),
-      col: Math.max(0, Math.min(level.cols - 1, Math.floor(point.x + level.cols / 2))),
-    }),
-    [level.cols, level.rows],
+  const getCellFromCoords = useCallback(
+    (clientX: number, clientY: number, clamp = false) => {
+      const dom = gl.domElement
+      const rect = dom.getBoundingClientRect()
+      if (rect.width <= 0 || rect.height <= 0) return null
+      const ndcX = ((clientX - rect.left) / rect.width) * 2 - 1
+      const ndcY = -(((clientY - rect.top) / rect.height) * 2 - 1)
+      const raycaster = new THREE.Raycaster()
+      raycaster.setFromCamera(new THREE.Vector2(ndcX, ndcY), camera)
+      const ray = raycaster.ray
+      if (Math.abs(ray.direction.y) < 1e-5) return null
+      const t = -ray.origin.y / ray.direction.y
+      if (t <= 0) return null
+      const hitX = ray.origin.x + t * ray.direction.x
+      const hitZ = ray.origin.z + t * ray.direction.z
+
+      const rawCol = Math.floor(hitX + level.cols / 2)
+      const rawRow = Math.floor(hitZ + level.rows / 2)
+
+      if (clamp) {
+        return {
+          col: Math.max(0, Math.min(level.cols - 1, rawCol)),
+          row: Math.max(0, Math.min(level.rows - 1, rawRow)),
+        }
+      }
+
+      const margin = 0.25
+      const halfW = level.cols / 2 + margin
+      const halfH = level.rows / 2 + margin
+      if (Math.abs(hitX) <= halfW && Math.abs(hitZ) <= halfH) {
+        return {
+          col: Math.max(0, Math.min(level.cols - 1, rawCol)),
+          row: Math.max(0, Math.min(level.rows - 1, rawRow)),
+        }
+      }
+      return null
+    },
+    [camera, gl.domElement, level.cols, level.rows],
   )
 
-  const updateSelection = useCallback((cell: { row: number; col: number }) => {
-    if (!startRef.current) return
-    movedRef.current ||=
-      cell.row !== startRef.current.row || cell.col !== startRef.current.col
-    const next = {
-      startRow: startRef.current.row,
-      startCol: startRef.current.col,
-      endRow: cell.row,
-      endCol: cell.col,
-    }
-    selectionRef.current = next
-    setSelection(next)
-  }, [])
+  useEffect(() => {
+    const dom = gl.domElement
+    const disabled = gameStatus !== "playing"
 
-  const finish = useCallback(() => {
-    const start = startRef.current
-    if (!start) return
-    const attemptedSelection = selectionRef.current
-    if (!movedRef.current) {
-      const existing = regionByCell.get(`${start.row},${start.col}`)
-      if (existing) onRemoveRegion(existing.id)
-    } else if (attemptedSelection) {
-      onPlaceRegion(attemptedSelection)
+    const handlePointerDown = (event: PointerEvent) => {
+      if (disabled || event.button !== 0 || !event.isPrimary) return
+      const cell = getCellFromCoords(event.clientX, event.clientY, false)
+      if (!cell) {
+        if (controlsRef.current) {
+          controlsRef.current.enabled = true
+        }
+        return
+      }
+
+      if (controlsRef.current) {
+        controlsRef.current.enabled = false
+      }
+
+      isInteractingRef.current = true
+      onInteractStateChange?.(true)
+      startRef.current = cell
+      startPosRef.current = { x: event.clientX, y: event.clientY }
+      movedRef.current = false
+
+      try {
+        dom.setPointerCapture(event.pointerId)
+      } catch {
+        // Ignore
+      }
+
+      const initial = {
+        startRow: cell.row,
+        startCol: cell.col,
+        endRow: cell.row,
+        endCol: cell.col,
+      }
+      selectionRef.current = initial
+      setSelection(initial)
+      invalidate()
     }
-    startRef.current = null
-    selectionRef.current = null
-    movedRef.current = false
-    setSelection(null)
-  }, [onPlaceRegion, onRemoveRegion, regionByCell])
+
+    const handlePointerMove = (event: PointerEvent) => {
+      if (!isInteractingRef.current || !startRef.current) return
+      const cell = getCellFromCoords(event.clientX, event.clientY, true)
+      if (!cell) return
+
+      const dist = startPosRef.current
+        ? Math.hypot(
+            event.clientX - startPosRef.current.x,
+            event.clientY - startPosRef.current.y,
+          )
+        : 0
+
+      if (
+        dist > 6 ||
+        cell.row !== startRef.current.row ||
+        cell.col !== startRef.current.col
+      ) {
+        movedRef.current = true
+      }
+
+      const next = {
+        startRow: startRef.current.row,
+        startCol: startRef.current.col,
+        endRow: cell.row,
+        endCol: cell.col,
+      }
+      selectionRef.current = next
+      setSelection(next)
+      invalidate()
+    }
+
+    const handlePointerUp = (event: PointerEvent) => {
+      if (!isInteractingRef.current) return
+
+      try {
+        dom.releasePointerCapture(event.pointerId)
+      } catch {
+        // Ignore
+      }
+
+      const start = startRef.current
+      const attempted = selectionRef.current
+      const hasMoved = movedRef.current
+
+      if (start) {
+        if (!hasMoved) {
+          const existing = regionByCell.get(`${start.row},${start.col}`)
+          if (existing) {
+            onRemoveRegion(existing.id)
+          }
+        } else if (attempted) {
+          onPlaceRegion(attempted)
+        }
+      }
+
+      isInteractingRef.current = false
+      onInteractStateChange?.(false)
+      startRef.current = null
+      startPosRef.current = null
+      movedRef.current = false
+      selectionRef.current = null
+      setSelection(null)
+
+      if (controlsRef.current) {
+        controlsRef.current.enabled = true
+      }
+      invalidate()
+    }
+
+    const handlePointerCancel = (event: PointerEvent) => {
+      if (!isInteractingRef.current) return
+      try {
+        dom.releasePointerCapture(event.pointerId)
+      } catch {
+        // Ignore
+      }
+      isInteractingRef.current = false
+      onInteractStateChange?.(false)
+      startRef.current = null
+      startPosRef.current = null
+      movedRef.current = false
+      selectionRef.current = null
+      setSelection(null)
+
+      if (controlsRef.current) {
+        controlsRef.current.enabled = true
+      }
+      invalidate()
+    }
+
+    dom.addEventListener("pointerdown", handlePointerDown, { capture: true })
+    window.addEventListener("pointermove", handlePointerMove, { passive: true })
+    window.addEventListener("pointerup", handlePointerUp)
+    window.addEventListener("pointercancel", handlePointerCancel)
+
+    return () => {
+      dom.removeEventListener("pointerdown", handlePointerDown, { capture: true })
+      window.removeEventListener("pointermove", handlePointerMove)
+      window.removeEventListener("pointerup", handlePointerUp)
+      window.removeEventListener("pointercancel", handlePointerCancel)
+    }
+  }, [
+    gameStatus,
+    getCellFromCoords,
+    gl.domElement,
+    invalidate,
+    onInteractStateChange,
+    onPlaceRegion,
+    onRemoveRegion,
+    regionByCell,
+    controlsRef,
+  ])
 
   const preview = selection ? normalizeSelection(selection) : null
-  const disabled = gameStatus !== "playing"
 
-  return (
-    <>
-      <mesh
-        rotation={[-Math.PI / 2, 0, 0]}
-        onPointerDown={(event) => {
-          if (disabled || event.button !== 0 || !event.isPrimary) return
-          event.stopPropagation()
-          capturePointer(event)
-          // Lock rotation HARD as soon as user touches board
-          if (controlsRef.current) {
-            controlsRef.current.enabled = false
-          }
-          const cell = cellFromPoint(event.point)
-          startRef.current = cell
-          movedRef.current = false
-          updateSelection(cell)
-        }}
-        onPointerMove={(event) => {
-          if (!startRef.current || disabled) return
-          event.stopPropagation()
-          updateSelection(cellFromPoint(event.point))
-        }}
-        onPointerUp={(event) => {
-          if (!startRef.current) return
-          event.stopPropagation()
-          capturePointer(event, true)
-          finish()
-          if (controlsRef.current) {
-            controlsRef.current.enabled = true
-          }
-        }}
-        onPointerCancel={(event) => {
-          event.stopPropagation()
-          capturePointer(event, true)
-          startRef.current = null
-          selectionRef.current = null
-          movedRef.current = false
-          setSelection(null)
-          if (controlsRef.current) {
-            controlsRef.current.enabled = true
-          }
-        }}
-      >
-        <planeGeometry args={[level.cols, level.rows]} />
-        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
-      </mesh>
-
-      {preview && <SelectionPreview rect={preview} level={level} />}
-    </>
-  )
-}
-
-function capturePointer(
-  event: { target: EventTarget | null; pointerId: number },
-  release = false,
-) {
-  const target = event.target as (EventTarget & {
-    setPointerCapture?: (pointerId: number) => void
-    releasePointerCapture?: (pointerId: number) => void
-  }) | null
-  try {
-    if (release) target?.releasePointerCapture?.(event.pointerId)
-    else target?.setPointerCapture?.(event.pointerId)
-  } catch {
-    // Safely ignore if pointerId is not captured on this element
-  }
+  return preview ? <SelectionPreview rect={preview} level={level} /> : null
 }
 
 function SelectionPreview({
@@ -463,6 +619,7 @@ function SelectionPreview({
 }) {
   const width = rect.c1 - rect.c0 + 1
   const depth = rect.r1 - rect.r0 + 1
+  const count = width * depth
   return (
     <group
       position={[
@@ -478,6 +635,56 @@ function SelectionPreview({
           <lineBasicMaterial color="#1d4ed8" />
         </lineSegments>
       </group>
+
+      {/* Internal cell dividers so 5 cells clearly show 5 cells */}
+      {width > 1 &&
+        Array.from({ length: width - 1 }, (_, i) => {
+          const x = i + 1 - width / 2
+          return (
+            <mesh
+              key={`prev-div-x-${i}`}
+              position={[x, 0.115, 0]}
+              scale={[0.025, 0.005, depth * 0.96]}
+              raycast={() => null}
+            >
+              <boxGeometry args={[1, 1, 1]} />
+              <meshBasicMaterial color="#1d4ed8" transparent opacity={0.6} />
+            </mesh>
+          )
+        })}
+      {depth > 1 &&
+        Array.from({ length: depth - 1 }, (_, i) => {
+          const z = i + 1 - depth / 2
+          return (
+            <mesh
+              key={`prev-div-z-${i}`}
+              position={[0, 0.115, z]}
+              scale={[width * 0.96, 0.005, 0.025]}
+              raycast={() => null}
+            >
+              <boxGeometry args={[1, 1, 1]} />
+              <meshBasicMaterial color="#1d4ed8" transparent opacity={0.6} />
+            </mesh>
+          )
+        })}
+
+      {/* Floating cell count label when dragging multiple cells */}
+      {count > 1 && (
+        <Text
+          position={[0, 0.28, 0]}
+          rotation={[-Math.PI / 2, 0, 0]}
+          fontSize={0.34}
+          color="#1d4ed8"
+          anchorX="center"
+          anchorY="middle"
+          outlineWidth={0.025}
+          outlineColor="#ffffff"
+          fontWeight="bold"
+          raycast={() => null}
+        >
+          {count}
+        </Text>
+      )}
     </group>
   )
 }
@@ -497,9 +704,12 @@ function Board3DScene({
     onPlaceRegion,
     onRemoveRegion,
     tutorialTarget,
+    tutorialMode,
+    tutorialPrompt,
     highlightClue,
   } = props
   const controlsRef = useRef<any>(null)
+  const [isInteracting, setIsInteracting] = useState(false)
 
   return (
     <>
@@ -514,7 +724,14 @@ function Board3DScene({
       />
       <CellGrid level={level} regions={regions} />
       <PlacedRegions level={level} regions={regions} />
-      <TutorialGuide level={level} target={tutorialTarget} />
+      <TutorialGuide
+        level={level}
+        target={tutorialTarget}
+        mode={tutorialMode}
+        prompt={tutorialPrompt}
+        isDragging={isInteracting}
+        regions={regions}
+      />
       <ClueLabels level={level} regions={regions} highlightClue={highlightClue} />
       <HintMesh level={level} hintRegion={hintRegion} />
       <BoardInteraction
@@ -524,6 +741,7 @@ function Board3DScene({
         onPlaceRegion={onPlaceRegion}
         onRemoveRegion={onRemoveRegion}
         controlsRef={controlsRef}
+        onInteractStateChange={setIsInteracting}
       />
     </>
   )

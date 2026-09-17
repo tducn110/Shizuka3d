@@ -1,144 +1,99 @@
-export type WinkStatus = 'connecting' | 'connected' | 'online' | 'standalone';
-export type WinkMode = 'wink' | 'offline';
-export type WinkPhase = 'booting' | 'ready_anonymous' | 'ready_authenticated' | 'error';
+export type WinkStatus = "connecting" | "connected" | "online" | "standalone"
+export type WinkMode = "wink" | "offline"
+export type WinkPhase = "booting" | "ready_anonymous" | "ready_authenticated"
+export type WinkLocale = "vi" | "en"
 
-export type WinkCapability =
-  | 'getLeaderboard'
-  | 'submitScore'
-  | 'complete'
-  | 'track';
+export type WinkCapability = "getLeaderboard" | "submitScore"
+export type WinkEvent = "pause" | "resume" | "mute" | "unmute" | "locale"
 
-export type WinkEvent =
-  | 'pause'
-  | 'resume'
-  | 'mute'
-  | 'unmute'
-  | 'locale';
-
-export type WinkIntegrationErrorCode =
-  | 'PARENT_REQUIRED'
-  | 'BRIDGE_READY_TIMEOUT'
-  | 'PROTOCOL_MISMATCH'
-  | 'RUNTIME_CONFIG_INVALID'
-  | 'SESSION_CREATE_FAILED'
-  | 'SESSION_RENEWAL_FAILED'
-  | 'SESSION_EXPIRED'
-  | 'CAPABILITY_DENIED'
-  | 'API_NETWORK_ERROR'
-  | 'MESSAGE_REJECTED'
-  | 'BRIDGE_MISSING'
-  | 'INVALID_SCORE'
-  | 'INVALID_ROUND';
+export type WinkIntegrationErrorCode = "API_NETWORK_ERROR" | "INVALID_SCORE"
 
 export interface WinkIntegrationError {
-  code: WinkIntegrationErrorCode;
-  message: string;
-  retryable: boolean;
+  code: WinkIntegrationErrorCode
+  message: string
+  retryable: boolean
 }
 
 export interface WinkLeaderboardEntry {
-  id?: string;
-  userId?: string | null;
-  isAnonymous?: boolean;
-  rank: number;
-  score: number;
-  playTime: number | null;
-  displayName: string | null;
-  avatarUrl: string | null;
-  createdAt?: string | null;
+  id?: string
+  userId?: string | null
+  isAnonymous?: boolean
+  rank: number
+  score: number
+  playTime: number | null
+  displayName: string | null
+  avatarUrl: string | null
+  createdAt?: string | null
 }
 
 export interface WinkLeaderboard {
-  entries: readonly WinkLeaderboardEntry[];
-  me: WinkLeaderboardEntry | null;
-  total?: number;
+  entries: readonly WinkLeaderboardEntry[]
+  me: WinkLeaderboardEntry | null
+  total?: number
 }
 
 export interface WinkPlayer {
-  isGuest: boolean;
-  displayName: string | null;
-  avatarUrl: string | null;
+  isGuest: boolean
+  displayName: string | null
+  avatarUrl: string | null
 }
 
 export interface WinkSubmitScoreResult {
-  entry: WinkLeaderboardEntry | null;
-  isNewBest: boolean;
-  previousBest?: number | null;
+  entry: WinkLeaderboardEntry | null
+  isNewBest: boolean
+  previousBest?: number | null
 }
 
 export interface WinkScoreInput {
-  score: number;
-  playTime?: number;
-  gameMode?: string;
-  counter?: number;
-  metadata?: Record<string, unknown>;
+  score: number
+  playTime?: number
 }
 
+/** The public SDK surface used by this game; no custom transport is allowed. */
 export interface WinkSDK {
-  init(): Promise<WinkSDK>;
-  gameplayStart(): void;
-  gameplayStop(): void;
+  init(): Promise<WinkSDK>
+  gameplayStart(): void
+  gameplayStop(): void
   submitScore(input: number | WinkScoreInput): Promise<{
-    entry: WinkLeaderboardEntry | null;
-    isNewBest: boolean;
-    previousBest: number | null;
-  }>;
-  getLeaderboard(options?: {
-    limit?: number;
-    offset?: number;
-  }): Promise<WinkLeaderboard>;
-  getPersonalBest(options?: unknown): Promise<{ me: WinkLeaderboardEntry | null }>;
-  track(eventName: string, properties?: Record<string, unknown>): Promise<void>;
-  on(event: WinkEvent, listener: (data?: any) => void): () => void;
-  can(capability: WinkCapability): boolean;
-  readonly player: WinkPlayer | null;
-  readonly locale: string;
-  readonly muted: boolean;
-  readonly status: WinkStatus;
-  readonly version: string;
-  readonly protocolVersion: number;
-  destroy(): void;
+    entry: WinkLeaderboardEntry | null
+    isNewBest: boolean
+    previousBest: number | null
+  }>
+  getLeaderboard(options?: { limit?: number; offset?: number }): Promise<WinkLeaderboard>
+  getPersonalBest(options?: unknown): Promise<{ me: WinkLeaderboardEntry | null }>
+  on(event: WinkEvent, listener: (data?: unknown) => void): () => void
+  can(capability: WinkCapability): boolean
+  readonly player: WinkPlayer | null
+  readonly locale: string
+  readonly muted: boolean
+  readonly status: WinkStatus
+  destroy(): void
 }
 
 declare global {
   interface Window {
-    Wink?: WinkSDK;
+    Wink?: WinkSDK
   }
 }
 
+/** Application-facing projection. Only the adapter itself accesses window.Wink. */
 export interface WinkIntegration {
-  status: WinkStatus;
-  isReady: boolean;
-  readyPromise: Promise<WinkSDK | null>;
-  sdk: WinkSDK | null;
-  mode: WinkMode;
-  phase: WinkPhase;
-  hostPaused: boolean;
-  parentMuted: boolean;
-  locale: string;
-  error: WinkIntegrationError | null;
-  leaderboard: readonly WinkLeaderboardEntry[];
-  personalBest: WinkLeaderboardEntry | null;
-  playerEntry: WinkLeaderboardEntry | null;
-  displayName: string | null;
-  bestScore: number;
-  canSubmitScore: boolean;
-  can(capability: WinkCapability): boolean;
-  gameplayStart(): void;
-  gameplayStop(): void;
-  refreshLeaderboard(): Promise<void>;
-  refreshPersonalBest(): Promise<void>;
-  fetchPersonalBest(): Promise<void>;
-  submitFinalScore(input: {
-    roundId?: string;
-    score: number;
-    playTimeSec?: number;
-    qualifies?: boolean;
-    metadata?: Record<string, unknown>;
-  }): Promise<WinkSubmitScoreResult | null>;
-  completeRound(input?: {
-    roundId?: string;
-    playDurationMs?: number;
-  }): Promise<void>;
-  track(eventName: string, properties?: Record<string, unknown>): void;
+  readyPromise: Promise<WinkSDK | null>
+  status: WinkStatus
+  isReady: boolean
+  mode: WinkMode
+  phase: WinkPhase
+  hostPaused: boolean
+  hostMuted: boolean
+  locale: WinkLocale
+  error: WinkIntegrationError | null
+  leaderboard: readonly WinkLeaderboardEntry[]
+  personalBest: WinkLeaderboardEntry | null
+  displayName: string | null
+  canSubmitScore: boolean
+  gameplayStart(): void
+  gameplayStop(): void
+  refreshLeaderboard(): Promise<void>
+  refreshPersonalBest(): Promise<void>
+  submitFinalScore(input: { score: number; playTimeSec?: number }): Promise<WinkSubmitScoreResult | null>
 }

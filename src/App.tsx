@@ -5,6 +5,8 @@ import { preloadCriticalResources, preloadNonCriticalResources } from "./utils/g
 import { completeGameLoading, onGameLoadingDismiss, setGameLoadingProgress } from "./utils/loading-controller";
 
 
+import { resolveGlobalWink } from "./integrations/wink/useWinkIntegration";
+
 export default function App() {
   // Unified PapaStudio loading screen lifecycle barrier
   useEffect(() => {
@@ -12,7 +14,8 @@ export default function App() {
     const criticalPromise = preloadCriticalResources((pct) => {
       setGameLoadingProgress(Math.min(95, pct));
     });
-    void Promise.allSettled([criticalPromise]).then(() => {
+    const winkPromise = resolveGlobalWink();
+    void Promise.allSettled([criticalPromise, winkPromise]).then(() => {
       completeGameLoading();
     });
     const unbind = onGameLoadingDismiss(() => {
