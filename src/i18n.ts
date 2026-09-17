@@ -13,13 +13,13 @@ const getInitialLanguage = (): SupportedLanguage => {
   } catch {
     // Storage read failure fallback
   }
-  // Contract: Wink-hosted initial language = Wink.locale if supported, otherwise English.
-  const winkLocale = (window as any).Wink?.locale;
-  if (typeof winkLocale === 'string') {
-    const normalized = winkLocale.split('-')[0];
-    if (isSupportedLanguage(normalized)) return normalized;
-  }
+  
   return 'en';
+};
+const syncDocumentLang = (lang: string) => {
+  if (typeof document !== "undefined" && document.documentElement) {
+    document.documentElement.lang = lang;
+  }
 };
 const persistLanguage = (language: string): void => { const normalized = language.split("-")[0]; if (typeof window === "undefined" || !isSupportedLanguage(normalized)) return; try { window.localStorage.setItem(LANGUAGE_STORAGE_KEY, normalized); } catch { /* Optional persistence. */ } };
 
@@ -33,6 +33,13 @@ const resources = {
         back: "Quay lại",
         close: "Đóng",
         retry: "Chơi lại",
+        next: "Tiếp tục →",
+        playGame: "Chơi ngay →",
+        leaderboard: "Bảng xếp hạng",
+        you: "Bạn",
+        loading: "Đang tải...",
+        noScores: "Chưa có điểm số nào",
+        anonymous: "Người chơi",
       },
       settings: {
         title: "Cài đặt",
@@ -48,6 +55,12 @@ const resources = {
         undo: "Hoàn tác",
         skipTutorial: "Bỏ qua hướng dẫn",
         howToPlay: "Cách chơi",
+        tutorialTitle: "Hướng dẫn",
+        levelTitle: "Màn",
+      },
+      completeModal: {
+        title: "Hoàn thành màn chơi",
+        solved: "Màn {{levelId}} đã giải xong",
       },
       tutorial: {
         step1: "Kéo bao phủ 3 ô cho số 3 để tạo khối.",
@@ -91,6 +104,13 @@ const resources = {
         back: "Back",
         close: "Close",
         retry: "Play again",
+        next: "Next →",
+        playGame: "Play Game →",
+        leaderboard: "Leaderboard",
+        you: "You",
+        loading: "Loading...",
+        noScores: "No scores yet",
+        anonymous: "Player",
       },
       settings: {
         title: "Settings",
@@ -106,6 +126,12 @@ const resources = {
         undo: "Undo",
         skipTutorial: "Skip Tutorial",
         howToPlay: "How to Play",
+        tutorialTitle: "Tutorial",
+        levelTitle: "Level",
+      },
+      completeModal: {
+        title: "Puzzle Complete",
+        solved: "Level {{levelId}} solved",
       },
       tutorial: {
         step1: "Drag across to cover 3 cells for number 3 to create a block.",
@@ -151,6 +177,10 @@ void i18n
     fallbackLng: DEFAULT_LANGUAGE,
     interpolation: { escapeValue: false },
   });
-i18n.on("languageChanged", persistLanguage);
+syncDocumentLang(i18n.language || DEFAULT_LANGUAGE);
+i18n.on("languageChanged", (lng) => {
+  persistLanguage(lng);
+  syncDocumentLang(lng);
+});
 
 export default i18n;

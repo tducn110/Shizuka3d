@@ -171,7 +171,7 @@ export default function LeaderboardModal({ onClose }: Props) {
                     </span>
                   </div>
                   <span style={{ fontSize: 14, fontWeight: 800, color: "#e27c26" }}>
-                    {entry.score.toLocaleString("vi-VN")}
+                    {entry.score.toLocaleString()}
                   </span>
                 </div>
               )
@@ -206,7 +206,7 @@ export default function LeaderboardModal({ onClose }: Props) {
             <span style={{ fontSize: 13, fontWeight: 600 }}>{playerName}</span>
           </div>
           <span style={{ fontSize: 14, fontWeight: 800 }}>
-            {personalBestScore.toLocaleString("vi-VN")}
+            {personalBestScore.toLocaleString()}
           </span>
         </div>
 

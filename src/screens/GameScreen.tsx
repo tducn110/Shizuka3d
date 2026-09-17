@@ -486,6 +486,7 @@ function HintButton({
   onHint: () => void
   disabled: boolean
 }) {
+  const { t } = useTranslation()
   return (
     <button
       onClick={onHint}
@@ -516,7 +517,7 @@ function HintButton({
       >
         <path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1Zm-.75 9.5V7.5h1.5v3h-1.5Zm.75-4.25a.75.75 0 1 1 0-1.5.75.75 0 0 1 0 1.5Z" />
       </svg>
-      Hint
+      {t("game.hint", "Hint")}
       <span
         style={{
           background: disabled ? "rgba(255,255,255,0.2)" : "#f59e0b",
@@ -541,11 +542,12 @@ function UndoButton({
   onUndo: () => void
   disabled: boolean
 }) {
+  const { t } = useTranslation()
   return (
     <button
       onClick={onUndo}
       disabled={disabled}
-      aria-label="Undo"
+      aria-label={t("game.undo", "Undo")}
       style={{
         width: 44,
         height: 44,

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react"
+import { useTranslation } from "react-i18next"
 import Button from "../../ui/components/Button"
 
 interface Props {
@@ -8,6 +9,7 @@ interface Props {
 }
 
 export default function CompleteModal({ levelId, onReplay, onNext }: Props) {
+  const { t } = useTranslation()
   const [visible, setVisible] = useState(false)
 
   useEffect(() => {
@@ -57,18 +59,18 @@ export default function CompleteModal({ levelId, onReplay, onNext }: Props) {
             letterSpacing: "-0.01em",
           }}
         >
-          Puzzle Complete
+          {t("completeModal.title", "Puzzle Complete")}
         </div>
         <div style={{ fontSize: 13, color: "#9a8270", marginBottom: 8 }}>
-          Level {levelId} solved
+          {t("completeModal.solved", { levelId, defaultValue: `Level ${levelId} solved` })}
         </div>
 
         <div style={{ display: "flex", gap: 10, width: "100%" }}>
           <Button variant="secondary" onClick={onReplay} style={{ flex: 1, fontSize: 14 }}>
-            Replay
+            {t("common.retry", "Replay")}
           </Button>
           <Button variant="primary" onClick={onNext} style={{ flex: 1, fontSize: 14 }}>
-            Next →
+            {t("common.next", "Next →")}
           </Button>
         </div>
       </div>

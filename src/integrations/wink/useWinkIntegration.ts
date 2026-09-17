@@ -161,7 +161,6 @@ export function useWinkIntegration(): WinkIntegration {
     (nextLocale: string | null | undefined) => {
       const normalized = normalizeWinkLocale(nextLocale)
       setLocale(normalized)
-      void i18n.changeLanguage(normalized)
     },
     [],
   )

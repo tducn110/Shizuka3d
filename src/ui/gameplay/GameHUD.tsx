@@ -48,7 +48,7 @@ export default function GameHUD({
             letterSpacing: "0.02em",
           }}
         >
-          {isTutorial ? `Tutorial ${levelId}` : `Level ${levelId}`}
+          {isTutorial ? `${t("game.tutorialTitle", "Tutorial")} ${levelId}` : `${t("game.levelTitle", "Level")} ${levelId}`}
         </div>
 
         {totalCount !== undefined && totalCount > 0 && (

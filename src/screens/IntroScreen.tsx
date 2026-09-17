@@ -6,6 +6,7 @@ import {
 } from "../behaviors/board-navigation/useCameraRotation"
 
 import Button from "../ui/components/Button"
+import { useTranslation } from "react-i18next"
 import { Trophy } from "lucide-react"
 import LeaderboardModal from "../ui/overlays/LeaderboardModal"
 
@@ -50,6 +51,7 @@ interface Props {
 }
 
 export default function IntroScreen({ onPlay }: Props) {
+  const { t } = useTranslation()
   const [showLeaderboard, setShowLeaderboard] = useState(false)
   // Keep the intro's ambient camera sway without exposing a control panel.
   const { angle } = useCameraRotation({
@@ -308,13 +310,13 @@ export default function IntroScreen({ onPlay }: Props) {
         <div style={{ display: "flex", gap: 12, alignItems: "center", marginTop: 8, pointerEvents: "all" }}>
           {onPlay && (
             <Button variant="hero" onClick={onPlay}>
-              Play Game →
+              {t("common.playGame", "Play Game →")}
             </Button>
           )}
           <button
             type="button"
             onClick={() => setShowLeaderboard(true)}
-            aria-label="Leaderboard"
+            aria-label={t("common.leaderboard", "Leaderboard")}
             style={{
               width: 52,
               height: 52,
