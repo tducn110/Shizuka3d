@@ -5,6 +5,7 @@ import * as THREE from "three"
 import type { GameStatus, Level, Region, RegionDef, Selection } from "../../core/types"
 import { normalizeSelection } from "../../core/geometry"
 import { createBoardBounds, frameBoard, projectBounds } from "../board-navigation/framing"
+import { audioManager } from "../../audio/audioManager"
 
 const MAT_OCCUPIED = new THREE.MeshStandardMaterial({ color: "#e4dbca", roughness: 0.9 })
 const MAT_FREE = new THREE.MeshStandardMaterial({ color: "#f8f3eb", roughness: 0.85 })
@@ -517,6 +518,10 @@ function BoardInteraction({
         startCol: startRef.current.col,
         endRow: cell.row,
         endCol: cell.col,
+      }
+      const prev = selectionRef.current
+      if (!prev || prev.endRow !== next.endRow || prev.endCol !== next.endCol) {
+        audioManager.playCellTick()
       }
       selectionRef.current = next
       setSelection(next)

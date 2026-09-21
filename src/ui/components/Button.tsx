@@ -1,11 +1,20 @@
 import React, { ButtonHTMLAttributes } from "react"
+import { audioManager } from "../../audio/audioManager"
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: "primary" | "secondary" | "hero" | "icon"
   children: React.ReactNode
 }
 
-export default function Button({ variant = "primary", children, style, onMouseEnter, onMouseLeave, ...props }: ButtonProps) {
+export default function Button({
+  variant = "primary",
+  children,
+  style,
+  onMouseEnter,
+  onMouseLeave,
+  onClick,
+  ...props
+}: ButtonProps) {
   const isHero = variant === "hero"
   const isSecondary = variant === "secondary"
   const isIcon = variant === "icon"
@@ -16,10 +25,10 @@ export default function Button({ variant = "primary", children, style, onMouseEn
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    transition: isHero 
-      ? "transform 0.15s, box-shadow 0.15s" 
-      : isIcon 
-        ? "background 0.15s" 
+    transition: isHero
+      ? "transform 0.15s, box-shadow 0.15s"
+      : isIcon
+        ? "background 0.15s"
         : "opacity 0.15s",
   }
 
@@ -90,11 +99,17 @@ export default function Button({ variant = "primary", children, style, onMouseEn
     onMouseLeave?.(e)
   }
 
+  const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    audioManager.playButtonClick()
+    onClick?.(e)
+  }
+
   return (
     <button
       style={{ ...baseStyle, ...variantStyles[variant], ...style }}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
+      onClick={handleClick}
       {...props}
     >
       {children}

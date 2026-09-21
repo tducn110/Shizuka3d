@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react"
 import { useTranslation } from "react-i18next"
 import Button from "../../ui/components/Button"
+import { audioManager } from "../../audio/audioManager"
 
 interface Props {
   levelId: number
@@ -13,9 +14,20 @@ export default function CompleteModal({ levelId, onReplay, onNext }: Props) {
   const [visible, setVisible] = useState(false)
 
   useEffect(() => {
-    const t = setTimeout(() => setVisible(true), 500)
-    return () => clearTimeout(t)
+    audioManager.playWin()
+    const timer = setTimeout(() => setVisible(true), 400)
+    return () => clearTimeout(timer)
   }, [])
+
+  const handleReplay = () => {
+    audioManager.playButtonClick()
+    onReplay()
+  }
+
+  const handleNext = () => {
+    audioManager.playButtonClick()
+    onNext()
+  }
 
   return (
     <div
@@ -62,14 +74,25 @@ export default function CompleteModal({ levelId, onReplay, onNext }: Props) {
           {t("completeModal.title", "Puzzle Complete")}
         </div>
         <div style={{ fontSize: 13, color: "#9a8270", marginBottom: 8 }}>
-          {t("completeModal.solved", { levelId, defaultValue: `Level ${levelId} solved` })}
+          {t("completeModal.solved", {
+            levelId,
+            defaultValue: `Level ${levelId} solved`,
+          })}
         </div>
 
         <div style={{ display: "flex", gap: 10, width: "100%" }}>
-          <Button variant="secondary" onClick={onReplay} style={{ flex: 1, fontSize: 14 }}>
+          <Button
+            variant="secondary"
+            onClick={handleReplay}
+            style={{ flex: 1, fontSize: 14 }}
+          >
             {t("common.retry", "Replay")}
           </Button>
-          <Button variant="primary" onClick={onNext} style={{ flex: 1, fontSize: 14 }}>
+          <Button
+            variant="primary"
+            onClick={handleNext}
+            style={{ flex: 1, fontSize: 14 }}
+          >
             {t("common.next", "Next →")}
           </Button>
         </div>

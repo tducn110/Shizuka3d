@@ -8,7 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "format": "oxfmt",
-    "test": "tsx tests/rules.test.ts && tsx tests/wink.test.ts",
+    "test": "tsx tests/rules.test.ts && tsx tests/wink.test.ts && tsx tests/audio.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

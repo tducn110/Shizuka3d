@@ -1,5 +1,6 @@
 import Button from "../../ui/components/Button"
 import { useTranslation } from "react-i18next"
+import { useAudioSettings } from "../../audio/useAudioSettings"
 
 interface Props {
   onResume: () => void
@@ -7,8 +8,14 @@ interface Props {
   onHowToPlay?: () => void
 }
 
-export default function PauseModal({ onResume, onRestart, onHowToPlay }: Props) {
+export default function PauseModal({
+  onResume,
+  onRestart,
+  onHowToPlay,
+}: Props) {
   const { t, i18n } = useTranslation()
+  const { sfxEnabled, musicEnabled, toggleSfx, toggleMusic } =
+    useAudioSettings()
   const currentLanguage = i18n.resolvedLanguage?.startsWith("en") ? "en" : "vi"
   const nextLanguage = currentLanguage === "vi" ? "en" : "vi"
 
@@ -32,12 +39,12 @@ export default function PauseModal({ onResume, onRestart, onHowToPlay }: Props) 
           background: "#fffdf8",
           borderRadius: 20,
           padding: "32px 36px",
-          width: 290,
+          width: 300,
           boxShadow: "0 20px 60px rgba(0,0,0,0.18)",
           border: "1.5px solid rgba(0,0,0,0.08)",
           display: "flex",
           flexDirection: "column",
-          gap: 12,
+          gap: 10,
           alignItems: "stretch",
         }}
       >
@@ -54,7 +61,27 @@ export default function PauseModal({ onResume, onRestart, onHowToPlay }: Props) 
           {t("common.pause")}
         </div>
 
-        <Button variant="secondary" onClick={() => void i18n.changeLanguage(nextLanguage)}>
+        <div style={{ display: "flex", gap: 8 }}>
+          <Button
+            variant="secondary"
+            onClick={toggleMusic}
+            style={{ flex: 1, fontSize: 13, padding: "10px 0" }}
+          >
+            🎵 {musicEnabled ? t("settings.on") : t("settings.off")}
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={toggleSfx}
+            style={{ flex: 1, fontSize: 13, padding: "10px 0" }}
+          >
+            🔊 {sfxEnabled ? t("settings.on") : t("settings.off")}
+          </Button>
+        </div>
+
+        <Button
+          variant="secondary"
+          onClick={() => void i18n.changeLanguage(nextLanguage)}
+        >
           {t("settings.language")}: {nextLanguage.toUpperCase()}
         </Button>
         {onHowToPlay && (
@@ -62,8 +89,12 @@ export default function PauseModal({ onResume, onRestart, onHowToPlay }: Props) 
             {t("game.howToPlay")}
           </Button>
         )}
-        <Button variant="primary" onClick={onResume}>{t("common.resume")}</Button>
-        <Button variant="secondary" onClick={onRestart}>{t("common.retry")}</Button>
+        <Button variant="primary" onClick={onResume}>
+          {t("common.resume")}
+        </Button>
+        <Button variant="secondary" onClick={onRestart}>
+          {t("common.retry")}
+        </Button>
       </div>
     </div>
   )

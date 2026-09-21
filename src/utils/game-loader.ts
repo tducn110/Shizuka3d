@@ -1,42 +1,53 @@
 // Preload strictly CRITICAL resources required for the initial game view.
 // ponytail: standard font and essential asset barrier without bloated queues
 
-let criticalPreloadPromise: Promise<void> | null = null;
+let criticalPreloadPromise: Promise<void> | null = null
 
 async function preloadFonts(): Promise<void> {
-  if (typeof document === 'undefined' || !('fonts' in document)) return;
+  if (typeof document === "undefined" || !("fonts" in document)) return
   try {
     // ponytail: preload only fonts actually declared in index.html to avoid stalls
     await Promise.all([
       document.fonts.load('500 16px "Plus Jakarta Sans"'),
       document.fonts.load('700 16px "Plus Jakarta Sans"'),
       document.fonts.load('700 16px "Space Grotesk"'),
-    ]);
-    await document.fonts.ready;
+    ])
+    await document.fonts.ready
   } catch {
     // Non-fatal font load fallback
   }
 }
 
-export function preloadCriticalResources(onProgress?: (pct: number) => void): Promise<void> {
-  if (criticalPreloadPromise) return criticalPreloadPromise;
+export function preloadCriticalResources(
+  onProgress?: (pct: number) => void,
+): Promise<void> {
+  if (criticalPreloadPromise) return criticalPreloadPromise
 
   criticalPreloadPromise = (async () => {
-    onProgress?.(30);
-    await preloadFonts().catch(() => {});
-    onProgress?.(70);
-    await new Promise((r) => setTimeout(r, 60));
-    onProgress?.(95);
+    onProgress?.(30)
+    await preloadFonts().catch(() => {})
+    onProgress?.(70)
+    await new Promise((r) => setTimeout(r, 60))
+    onProgress?.(95)
   })()
     .then(() => undefined)
     .catch((error) => {
-      criticalPreloadPromise = null;
-      throw error;
-    });
+      criticalPreloadPromise = null
+      throw error
+    })
 
-  return criticalPreloadPromise;
+  return criticalPreloadPromise
 }
 
+import { audioManager } from "../audio/audioManager"
+
 export function preloadNonCriticalResources(): void {
-  // Deferred non-critical tasks
+  // Deferred non-critical tasks: warm audio manager
+  try {
+    if (typeof window !== "undefined") {
+      audioManager.getMusicEnabled()
+    }
+  } catch {
+    // Non-fatal
+  }
 }

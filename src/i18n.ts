@@ -21,6 +21,11 @@ const syncDocumentLang = (lang: string) => {
     document.documentElement.lang = lang;
   }
 };
+export const formatNumber = (value: number, lang?: string): string => {
+  const current = lang || i18n.resolvedLanguage || i18n.language || "en";
+  return value.toLocaleString(current.startsWith("vi") ? "vi-VN" : "en-US");
+};
+
 const persistLanguage = (language: string): void => { const normalized = language.split("-")[0]; if (typeof window === "undefined" || !isSupportedLanguage(normalized)) return; try { window.localStorage.setItem(LANGUAGE_STORAGE_KEY, normalized); } catch { /* Optional persistence. */ } };
 
 const resources = {
@@ -173,7 +178,7 @@ void i18n
   .init({
     resources,
     lng: getInitialLanguage(),
-    supportedLngs: ["vi", "en"],
+    supportedLngs: ["en", "vi"],
     fallbackLng: DEFAULT_LANGUAGE,
     interpolation: { escapeValue: false },
   });

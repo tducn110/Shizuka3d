@@ -1,6 +1,7 @@
 import Button from "../../ui/components/Button"
 import { useTranslation } from "react-i18next"
-import { HelpCircle, Trophy } from "lucide-react"
+import { HelpCircle, Trophy, Volume2, VolumeX } from "lucide-react"
+import { useAudioSettings } from "../../audio/useAudioSettings"
 
 interface Props {
   levelId: number
@@ -24,6 +25,7 @@ export default function GameHUD({
   totalCount,
 }: Props) {
   const { t } = useTranslation()
+  const { soundEnabled, toggleMaster } = useAudioSettings()
 
   return (
     <div
@@ -48,7 +50,9 @@ export default function GameHUD({
             letterSpacing: "0.02em",
           }}
         >
-          {isTutorial ? `${t("game.tutorialTitle", "Tutorial")} ${levelId}` : `${t("game.levelTitle", "Level")} ${levelId}`}
+          {isTutorial
+            ? `${t("game.tutorialTitle", "Tutorial")} ${levelId}`
+            : `${t("game.levelTitle", "Level")} ${levelId}`}
         </div>
 
         {totalCount !== undefined && totalCount > 0 && (
@@ -98,6 +102,18 @@ export default function GameHUD({
             <HelpCircle size={18} color="#6b5744" />
           </Button>
         )}
+
+        <Button
+          variant="icon"
+          onClick={toggleMaster}
+          aria-label={soundEnabled ? t("settings.sfx") : t("settings.sfx")}
+        >
+          {soundEnabled ? (
+            <Volume2 size={18} color="#6b5744" />
+          ) : (
+            <VolumeX size={18} color="#a39281" />
+          )}
+        </Button>
 
         {onLeaderboard && (
           <Button

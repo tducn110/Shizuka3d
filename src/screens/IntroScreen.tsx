@@ -7,8 +7,10 @@ import {
 
 import Button from "../ui/components/Button"
 import { useTranslation } from "react-i18next"
-import { Trophy } from "lucide-react"
+import { Trophy, Volume2, VolumeX } from "lucide-react"
 import LeaderboardModal from "../ui/overlays/LeaderboardModal"
+import { audioManager } from "../audio/audioManager"
+import { useAudioSettings } from "../audio/useAudioSettings"
 
 // ── Grid units and scale ───────────────────────────────────────────────────
 const S = 48 // pixels per grid unit
@@ -52,7 +54,15 @@ interface Props {
 
 export default function IntroScreen({ onPlay }: Props) {
   const { t } = useTranslation()
+  const { soundEnabled, toggleMaster } = useAudioSettings()
   const [showLeaderboard, setShowLeaderboard] = useState(false)
+
+  const handlePlay = useCallback(() => {
+    audioManager.unlockFromGesture()
+    audioManager.playButtonClick()
+    onPlay?.()
+  }, [onPlay])
+
   // Keep the intro's ambient camera sway without exposing a control panel.
   const { angle } = useCameraRotation({
     autoSway: true,
@@ -307,15 +317,49 @@ export default function IntroScreen({ onPlay }: Props) {
         >
           Shikaku 3D
         </h1>
-        <div style={{ display: "flex", gap: 12, alignItems: "center", marginTop: 8, pointerEvents: "all" }}>
+        <div
+          style={{
+            display: "flex",
+            gap: 12,
+            alignItems: "center",
+            marginTop: 8,
+            pointerEvents: "all",
+          }}
+        >
           {onPlay && (
-            <Button variant="hero" onClick={onPlay}>
+            <Button variant="hero" onClick={handlePlay}>
               {t("common.playGame", "Play Game →")}
             </Button>
           )}
           <button
             type="button"
-            onClick={() => setShowLeaderboard(true)}
+            onClick={toggleMaster}
+            aria-label={soundEnabled ? t("settings.sfx") : t("settings.sfx")}
+            style={{
+              width: 52,
+              height: 52,
+              borderRadius: 16,
+              border: "1.5px solid rgba(0,0,0,0.12)",
+              background: "#fffdf8",
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              boxShadow: "0 8px 24px rgba(0,0,0,0.08)",
+            }}
+          >
+            {soundEnabled ? (
+              <Volume2 size={22} color="#6b5744" />
+            ) : (
+              <VolumeX size={22} color="#a39281" />
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              audioManager.playButtonClick()
+              setShowLeaderboard(true)
+            }}
             aria-label={t("common.leaderboard", "Leaderboard")}
             style={{
               width: 52,
@@ -334,7 +378,9 @@ export default function IntroScreen({ onPlay }: Props) {
           </button>
         </div>
       </div>
-      {showLeaderboard && <LeaderboardModal onClose={() => setShowLeaderboard(false)} />}
+      {showLeaderboard && (
+        <LeaderboardModal onClose={() => setShowLeaderboard(false)} />
+      )}
     </div>
   )
 }

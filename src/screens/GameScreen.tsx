@@ -13,6 +13,7 @@ import HowToPlayModal from "../ui/overlays/HowToPlayModal"
 import { showInterstitial } from "../integrations/ads/googleH5Ads"
 import { useWinkIntegration } from "../integrations/wink/useWinkIntegration"
 import { AlertCircle, CheckCircle } from "lucide-react"
+import { audioManager } from "../audio/audioManager"
 
 const TUTORIAL_STEPS = [
   {
@@ -52,20 +53,23 @@ export default function GameScreen() {
   const [levelIndex, setLevelIndex] = useState(0)
   const [showLeaderboard, setShowLeaderboard] = useState(false)
   const [showHowToPlay, setShowHowToPlay] = useState(false)
-  const [feedback, setFeedback] = useState<{ message: string; type: "error" | "success" | "warning" } | null>(null)
+  const [feedback, setFeedback] = useState<{
+    message: string
+    type: "error" | "success" | "warning"
+  } | null>(null)
   const [tutorialStage, setTutorialStage] = useState(0)
   const feedbackTimerRef = useRef<NodeJS.Timeout | null>(null)
   const transitionPendingRef = useRef(false)
   const wink = useWinkIntegration()
-  
+
   // 1. Match Lifecycle Behavior
   const match = useMatchController(LEVELS[levelIndex])
-  
+
   const roundStartedRef = useRef(false)
-  
+
   // 2. Play Move Behavior
   const playMove = usePlayMoveController(match.level, match.complete)
-  
+
   // 3. Hint System Behavior
   const hints = useHintController(match.level, playMove.regions)
 
@@ -126,32 +130,44 @@ export default function GameScreen() {
     }
   }
 
-  const handlePlaceRegion = useCallback((region: any) => {
-    if (!roundStartedRef.current) {
-      wink.gameplayStart()
-      roundStartedRef.current = true
-    }
-    const result = playMove.placeRegion(region)
-    if (!result.success) {
-      if (result.reason === "out of bounds") {
-        setFeedback({ message: t("feedback.outOfBounds"), type: "error" })
-        if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current)
-        feedbackTimerRef.current = setTimeout(() => setFeedback(null), 2500)
+  const handlePlaceRegion = useCallback(
+    (region: any) => {
+      audioManager.unlockFromGesture()
+      if (!roundStartedRef.current) {
+        wink.gameplayStart()
+        roundStartedRef.current = true
       }
-    } else {
-      setFeedback(null)
-      if (match.level.id === 1) {
-        setTutorialStage((prev) => {
-          if (prev === 0) return 1
-          if (prev === 2) return 3
-          if (prev === 3) return 4
-          if (prev === 4) return 5
-          return prev
-        })
+      const result = playMove.placeRegion(region)
+      if (!result.success) {
+        audioManager.playError()
+        if (result.reason === "out of bounds") {
+          setFeedback({ message: t("feedback.outOfBounds"), type: "error" })
+          if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current)
+          feedbackTimerRef.current = setTimeout(() => setFeedback(null), 2500)
+        }
+      } else {
+        setFeedback(null)
+        const r0 = Math.min(region.startRow, region.endRow)
+        const r1 = Math.max(region.startRow, region.endRow)
+        const c0 = Math.min(region.startCol, region.endCol)
+        const c1 = Math.max(region.startCol, region.endCol)
+        const area = (r1 - r0 + 1) * (c1 - c0 + 1)
+        const isMatch = Boolean(result.clueValue && result.clueValue === area)
+        audioManager.playPlaceRegion(isMatch)
+        if (match.level.id === 1) {
+          setTutorialStage((prev) => {
+            if (prev === 0) return 1
+            if (prev === 2) return 3
+            if (prev === 3) return 4
+            if (prev === 4) return 5
+            return prev
+          })
+        }
       }
-    }
-    return result
-  }, [wink, playMove, match.level.id, t])
+      return result
+    },
+    [wink, playMove, match.level.id, t],
+  )
 
   // Check if board is 100% covered but not yet solved
   const totalCells = match.level.rows * match.level.cols
@@ -162,6 +178,7 @@ export default function GameScreen() {
       covered += reg.width * reg.height
     }
     if (covered >= totalCells) {
+      audioManager.playWarning()
       setFeedback({
         message: t("feedback.boardFullIncorrect"),
         type: "warning",
@@ -171,20 +188,25 @@ export default function GameScreen() {
     }
   }, [playMove.regions, match.status, totalCells, t])
 
-  const handleRemoveRegion = useCallback((id: string) => {
-    if (!roundStartedRef.current) {
-      wink.gameplayStart()
-      roundStartedRef.current = true
-    }
-    setFeedback(null)
-    playMove.removeRegion(id)
-    if (match.level.id === 1) {
-      setTutorialStage((prev) => {
-        if (prev === 1) return 2
-        return prev
-      })
-    }
-  }, [wink, playMove, match.level.id])
+  const handleRemoveRegion = useCallback(
+    (id: string) => {
+      audioManager.unlockFromGesture()
+      audioManager.playRemoveRegion()
+      if (!roundStartedRef.current) {
+        wink.gameplayStart()
+        roundStartedRef.current = true
+      }
+      setFeedback(null)
+      playMove.removeRegion(id)
+      if (match.level.id === 1) {
+        setTutorialStage((prev) => {
+          if (prev === 1) return 2
+          return prev
+        })
+      }
+    },
+    [wink, playMove, match.level.id],
+  )
 
   // Stop round on unmount if active
   useEffect(() => {
@@ -212,12 +234,17 @@ export default function GameScreen() {
 
   // React to host pause / resume
   useEffect(() => {
+    audioManager.setHostPaused(wink.hostPaused)
     if (wink.hostPaused && match.status === "playing") {
       match.pause()
     } else if (!wink.hostPaused && match.status === "paused") {
       match.resume()
     }
   }, [wink.hostPaused, match.status])
+
+  useEffect(() => {
+    audioManager.setHostMuted(wink.hostMuted)
+  }, [wink.hostMuted])
 
   // Sync behaviors on match.boardRevision change (when level is loaded or restarted)
   useEffect(() => {
@@ -247,6 +274,7 @@ export default function GameScreen() {
   const goNext = async () => {
     if (transitionPendingRef.current) return
     transitionPendingRef.current = true
+    audioManager.playButtonClick()
     await showInterstitial({ type: "next", name: "next_shikaku_level" })
     const next = (levelIndex + 1) % LEVELS.length
     setLevelIndex(next)
@@ -258,6 +286,7 @@ export default function GameScreen() {
   const goReplay = async () => {
     if (transitionPendingRef.current) return
     transitionPendingRef.current = true
+    audioManager.playButtonClick()
     await showInterstitial({ type: "next", name: "replay_shikaku_level" })
     match.restart()
     roundStartedRef.current = false
@@ -355,7 +384,9 @@ export default function GameScreen() {
               padding: "6px 14px",
               borderRadius: 12,
               background: tutorialMode === "remove" ? "#fff7ed" : "#eff6ff",
-              border: `1px solid ${tutorialMode === "remove" ? "#fed7aa" : "#bfdbfe"}`,
+              border: `1px solid ${
+                tutorialMode === "remove" ? "#fed7aa" : "#bfdbfe"
+              }`,
               color: tutorialMode === "remove" ? "#9a3412" : "#1e40af",
               fontSize: 13,
               fontWeight: 600,
@@ -411,7 +442,14 @@ export default function GameScreen() {
           position: "relative",
         }}
       >
-        <div style={{ width: "100%", height: "100%", minHeight: 0, position: "relative" }}>
+        <div
+          style={{
+            width: "100%",
+            height: "100%",
+            minHeight: 0,
+            position: "relative",
+          }}
+        >
           <IsometricBoard
             level={match.level}
             regions={playMove.regions}
@@ -441,11 +479,17 @@ export default function GameScreen() {
       >
         <HintButton
           count={hints.hintCount}
-          onHint={hints.showHint}
+          onHint={() => {
+            audioManager.playHint()
+            hints.showHint()
+          }}
           disabled={match.status !== "playing" || hints.hintCount === 0}
         />
         <UndoButton
-          onUndo={playMove.undo}
+          onUndo={() => {
+            audioManager.playUndo()
+            playMove.undo()
+          }}
           disabled={playMove.history.length === 0 || match.status !== "playing"}
         />
       </div>
